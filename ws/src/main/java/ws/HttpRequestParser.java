@@ -2,24 +2,67 @@ package ws;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
+import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.Objects;
+import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.Vector;
 
 public class HttpRequestParser {
-	//TODO: move this to a properties file
-	private static final String VERSION = "HTTP/1.1";
+	private Properties config = new Properties();
+	private String version = null;
 	
 	HttpResponse responseObj = null;
 	private Hashtable<String,String> headerHash = new Hashtable<String,String>();
 	private Socket socket = null;
 	
 	public HttpRequestParser(Socket socket) {
+		try {
+			InputStream in = null;
+			try {
+				File pfile = new File("./src/main/resources/config.properties");
+				in = new FileInputStream(pfile);
+				config.load(in);
+				in.close();
+			}
+			catch(IOException ioe) {
+				ioe.printStackTrace();
+			}
+			
+			//if we couldn't get the file from the file system, try the classloader
+			if(in == null) {
+				try {
+					String filename = "main/resources/config.properties";
+					ClassLoader cl = getClass().getClassLoader();
+					URL res = Objects.requireNonNull(cl.getResource(filename),"Can't find configuration file " + filename);
+					
+					in = new FileInputStream(res.getFile());
+					config.load(in);
+					in.close();
+				}
+				catch(IOException ioex) {
+					ioex.printStackTrace();
+				}
+			}
+				
+			if(config.containsKey("version"))
+				version = config.getProperty("version");
+			
+			if(version == null)
+				throw new Exception("Invalid configuration. Please update application configuration file");
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}	
+		
 		this.socket = socket;
 		responseObj = new HttpResponse(socket);
 	}
@@ -43,7 +86,6 @@ public class HttpRequestParser {
     		bis = new BufferedInputStream(is, 4096);
 	     	metver = stringifyBinaryLine(bis);
 	     	metver = URLDecoder.decode(metver, "UTF-8"); //remove escaped characters
-	     	System.out.println("metver " + metver);
     	}
     	catch(IOException ee) {
     		ee.printStackTrace();
@@ -70,7 +112,7 @@ public class HttpRequestParser {
 		    		responseObj.sendResponse("400");
 		    		return;
 		    	}
-		    	if(!httpver.equals(VERSION)) {
+		    	if(!httpver.equals(version)) {
 		    		responseObj.sendResponse("505");
 		    		return;
 		    	}
@@ -87,11 +129,9 @@ public class HttpRequestParser {
     	try {
 	    	//parse headers
     		String headstr = stringifyBinaryLine(bis);
-    		System.out.println("head " + headstr);
-	    	while(headstr != null && headstr.length() > 1) {
+    		while(headstr != null && headstr.length() > 1) {
 	    		headers.add(headstr);
 	    		headstr = stringifyBinaryLine(bis);
-	    		System.out.println("head " + headstr);
 	    	}
 	    	if(headers.size() > 0)
 	    		parseHeaders(headers);
@@ -102,7 +142,6 @@ public class HttpRequestParser {
 		    	return;
 		    }
 		    else if (method.equalsIgnoreCase("PUT")) {
-		    	System.out.println("calling put");
 		    	responseObj.putResponse(decodeloc, bis);
 	    		return;
 		    }
