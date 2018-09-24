@@ -11,6 +11,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.Socket;
+import java.net.URL;
+import java.util.Objects;
+import java.util.Properties;
 import java.util.Vector;
 
 import javax.activation.MimetypesFileTypeMap;
@@ -21,9 +24,48 @@ public class HttpResponse {
 	private Socket socket = null;
 	private File contentFile = null;
 	
-	//TODO: put file path in properties file
+	private Properties config = new Properties();
+	private String fileroot = null;
 	
 	public HttpResponse(Socket socket) {
+		try {
+			InputStream in = null;
+			try {
+				File pfile = new File("./src/main/resources/config.properties");
+				in = new FileInputStream(pfile);
+				config.load(in);
+				in.close();
+			}
+			catch(IOException ioe) {
+				ioe.printStackTrace();
+			}
+			
+			//if we couldn't get the file from the file system, try the classloader
+			if(in == null) {
+				try {
+					String filename = "main/resources/config.properties";
+					ClassLoader cl = getClass().getClassLoader();
+					URL res = Objects.requireNonNull(cl.getResource(filename),"Can't find configuration file " + filename);
+					
+					in = new FileInputStream(res.getFile());
+					config.load(in);
+					in.close();
+				}
+				catch(IOException ioex) {
+					ioex.printStackTrace();
+				}
+			}
+				
+			if(config.containsKey("fileroot"))
+				fileroot = config.getProperty("fileroot");
+			
+			if(fileroot == null)
+				throw new Exception("Invalid configuration. Please update application configuration file");
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}
+				
 		this.socket = socket;
 	}
 	
@@ -38,9 +80,9 @@ public class HttpResponse {
 			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0) //path
 				modfileloc = "." + fileloc.substring(1); //trim first / and add a dot
 			else if(fileloc.startsWith("/") && fileloc.length() > 1) //file
-				modfileloc = "./src/main/resources/files" + fileloc;
+				modfileloc = fileroot + fileloc;
 			else if(fileloc.startsWith("/") && fileloc.length() == 1) //naked
-				modfileloc = "./src/main/resources/files/getfile.txt";
+				modfileloc = fileroot + "getfile.txt";
 			
 			if(modfileloc != null) {
 				String mimetype = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(modfileloc);
