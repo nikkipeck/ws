@@ -90,10 +90,12 @@ public class HttpResponse {
 			}
 			
 			out = new BufferedOutputStream(new FileOutputStream(modfileloc));
-			System.out.println("new file " + fileIsNew);
-			is.transferTo(out); //TODO: this is blocking because is never gets an EOF
-			out.flush();
-			out.close();
+			//is.transferTo(out); //TODO: this is blocking because is never gets an EOF
+			byte[] buffer = new byte[4 * 1024];
+			while (is.available() > 0) {
+				int len = is.read(buffer);
+			    out.write(buffer, 0, len);
+			}
 			
 			if(fileIsNew)
 				sendResponse("201");
