@@ -1,34 +1,33 @@
 package ws;
 
-import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.net.Socket;
 import java.util.Vector;
 
+import javax.activation.MimetypesFileTypeMap;
+
 public class HttpResponse {
-	private static final String VERSION = "HTTP/1.1";
 	private Vector<String> headers = new Vector<String>();
-	private Vector<String> body = new Vector<String>();
 	private StatusCode codes = new StatusCode();
-	//TODO: allowed, then implement more methods, SYNCHRONIZE
+	private Socket socket = null;
+	private File contentFile = null;
 	
-	public String getResponse(String fileloc) {
-		headers.add(VERSION);
-		if(fileloc == null) {
-			headers.add(codes.getMessageFromCode("400"));
-			return buildResponseString();
+	public HttpResponse(Socket socket) {
+		this.socket = socket;
+	}
+	
+	public void getResponse(String fileloc) {
+		if(fileloc == null) {			
+			sendResponse("400");
+			return;
 		}
-		
-		fileloc = fileloc.trim(); //trim off random whitespace
-		fileloc = fileloc.replaceAll("%20", ""); //get rid of escaped spaces
-			
-		InputStream in = null;
-		BufferedReader reader = null;
 		
 		try {
 			String modfileloc = null;
@@ -39,154 +38,157 @@ public class HttpResponse {
 			else if(fileloc.startsWith("/") && fileloc.length() == 1) //naked
 				modfileloc = "./src/main/resources/files/getfile.txt";
 			
-			synchronized(this){				
-				if(modfileloc != null) {
-					in = new FileInputStream(modfileloc);
-					reader = new BufferedReader(new InputStreamReader(in));
-					
-					StringBuffer sb = new StringBuffer();
-					String reqstr = reader.readLine();
-					
-			    	while(reqstr != null && !reqstr.equals("")) {
-			    		sb.append(reqstr + "\r\n");
-			    		reqstr = reader.readLine();
-			    	}				
-					
-					headers.add(codes.getMessageFromCode("200"));
-					headers.add("Content-Type: text/plain\r\n");
-					headers.add("Cache-Control: no-cache\r\n");
-					body.add(sb.toString());
-				}
-				else
-					headers.add(codes.getMessageFromCode("400")); //TODO: is this reachable?
-			} 
+			if(modfileloc != null) {
+				String mimetype = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(modfileloc);
+				headers.add("Content-Type: " + mimetype + "\r\n");
+				headers.add("Content-Length: " + new File(modfileloc).length() + "\r\n");
+				contentFile = new File(modfileloc);
+				sendResponse("200");
+				return;
+			}
+			else {
+				sendResponse("400");
+				return;
+			}
 		}
 		catch(Exception e) {
 			e.printStackTrace();
-			headers.add(codes.getMessageFromCode("404"));
+			sendResponse("404");
 		}
-		finally{
-			try {
-				//cleanup
-				if(reader != null)
-		    		reader.close();
-		    	if(in != null)
-		    		in.close();
-			}
-			catch(IOException e) {
-				e.printStackTrace();
-			}
-		}
-		
-		return buildResponseString();
 	}
 	
-	public String putResponse(String fileloc, String payload) {
-		headers.add(VERSION);
+	public void putResponse(String fileloc, InputStream is) {
 		if(fileloc == null) {
-			headers.add(codes.getMessageFromCode("400"));
-			return buildResponseString();
+			sendResponse("400");
+			return;
 		}
 		
-		fileloc = fileloc.trim(); //trim off random whitespace
-		fileloc = fileloc.replaceAll("%20", ""); //get rid of escaped spaces
+		String modfileloc = null;
+		if(fileloc.startsWith("/") && fileloc.length() > 1) //file
+			modfileloc = "./src/main/resources/files" + fileloc;
+		else {
+			sendResponse("400");
+			return;
+		}
 		
 		boolean fileIsNew = false;
-		InputStream in = null;
-		PrintWriter writer = null;
-		FileWriter fw = null;
+		OutputStream out = null;
+		try {
+			if(modfileloc != null){
+				try
+				{
+					InputStream in = new FileInputStream(modfileloc);
+					in.close();
+				}
+				catch(FileNotFoundException fnf) {
+					fileIsNew = true;
+				}
+			}
+			
+			out = new FileOutputStream(modfileloc);
+			byte[] bytebuff = new byte[4*1024];
+			for(int l; (l = is.read(bytebuff)) != -1;) {
+				out.write(bytebuff,  0, l);
+			}
+									
+			if(fileIsNew)
+				sendResponse("201");
+			else
+				sendResponse("200");
+			return;
+		}
+		catch(IOException ie) {
+			ie.printStackTrace();
+			sendResponse("400");
+		}
+		finally {
+			try {out.close();}
+            catch(Exception e){}
+		}
+	}
+	
+	public void headResponse(String fileloc) {
+		if(fileloc == null) {			
+			sendResponse("400");
+			return;
+		}
 		
 		try {
 			String modfileloc = null;
-			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0) { //path, not allowed
-				headers.add(codes.getMessageFromCode("403"));
-				return buildResponseString();
-			}
+			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0) //path
+				modfileloc = "." + fileloc.substring(1); //trim first / and add a dot
 			else if(fileloc.startsWith("/") && fileloc.length() > 1) //file
 				modfileloc = "./src/main/resources/files" + fileloc;
-			else if(fileloc.startsWith("/") && fileloc.length() == 1) { //naked, bad request
-				headers.add(codes.getMessageFromCode("400"));
-				return buildResponseString();
-			}
+			else if(fileloc.startsWith("/") && fileloc.length() == 1) //naked
+				modfileloc = "./src/main/resources/files/getfile.txt";
 			
-			synchronized(this){				
-				if(modfileloc != null) {
-					try {
-						in = new FileInputStream(modfileloc);
-						in.close();
-					}
-					catch(FileNotFoundException fnf) {
-						fileIsNew = true;
-					}
-					
-					//write file
-					fw = new FileWriter(modfileloc);
-				    writer = new PrintWriter(fw);
-				    writer.write(payload);
-				    				
-					if(fileIsNew)
-						headers.add(codes.getMessageFromCode("201"));
-					else
-						headers.add(codes.getMessageFromCode("200"));
-				}
+			if(modfileloc != null) {
+				String mimetype = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(modfileloc);
+				headers.add("Content-Type: " + mimetype + "\r\n");
+				headers.add("Content-Length: " + new File(modfileloc).length() + "\r\n");
+				/*rfc2616 The HEAD method is identical to GET except that the server MUST NOT
+				   return a message-body in the response, so no body on this one*/				
+				sendResponse("200");
+				return;
+			}
+			else {
+				sendResponse("400");
+				return;
 			}
 		}
 		catch(Exception e) {
 			e.printStackTrace();
-			headers.add(codes.getMessageFromCode("404"));
+			sendResponse("404");
 		}
-		finally{
-			try {
-				//cleanup
-				if(fw != null)
-					fw.close();
-				if(writer != null)
-		    		writer.close();
-		    	if(in != null)
-		    		in.close();
-			}
-			catch(IOException e) {
-				e.printStackTrace();
-			}
-		}
+	}
 		
-		return buildResponseString();
-	}
-	
-	public String respond401() {
-		headers.add(VERSION);
-		headers.add(codes.getMessageFromCode("401"));
-		return buildResponseString();
-	}
-	
-	public String respond400() {
-		headers.add(VERSION);
-		headers.add(codes.getMessageFromCode("400"));
-		return buildResponseString();
-	}
-	
-	public String respond200() {
-		headers.add(VERSION);
-		headers.add(codes.getMessageFromCode("200"));
-		return buildResponseString();
-	}
-	
-	private String buildResponseString() {
+	public void sendResponse(String code) {
 		StringBuffer respbuff = new StringBuffer();
-		//version and status need to be one line
+		
+		//rfc2616 Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+		respbuff.append("HTTP/1.1 " + codes.getMessageFromCode(code) + "\r\n");
+		
 		for(String r : headers) {
-			respbuff.append(r + " ");
+			respbuff.append(r);
 		}
 		
 		respbuff.append("Connection: close\r\n"); //close connection
         respbuff.append("\r\n"); //end headers
         
-        if(body.size() > 0) {
-        	for(String b : body) {
-	        	respbuff.append(b);
+        OutputStream out = null;
+        PrintStream ps = null;
+        FileInputStream in = null;
+        try {
+	        out = socket.getOutputStream();
+	        ps = new PrintStream(out);
+	        ps.print(respbuff.toString()); //this contains headers
+	        
+	        if(contentFile != null && contentFile.length() > 0) {
+		        in = new FileInputStream(contentFile);
+		        in.transferTo(ps);
+	        }
+	        
+	        ps.flush();
+	        ps.close();
+	        
+	        out.flush();
+	        out.close();
+        }
+        catch(IOException ioe) {
+        	ioe.printStackTrace();
+        }
+        finally {
+        	if(ps != null)
+        		ps.close();
+	        try {
+		        if(out != null)
+		        	out.close();
+		        if(in != null)
+		        	in.close();
+	        }
+	        catch(IOException psh) {
+	        	psh.printStackTrace();
 	        }
         }
-		
-		return respbuff.toString();
 	}
 }
