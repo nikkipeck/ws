@@ -25,15 +25,9 @@ public class SimpleServer implements Runnable{
 			servicer = Executors.newFixedThreadPool(MAX_THREADS);
 		}
 		catch(IOException ie) {
+			try {hsock.close();}
+			catch(Exception e) {}
 			ie.printStackTrace();
-		}
-		finally {
-			try {
-				hsock.close();
-			}
-			catch(IOException lastTry) {
-				lastTry.printStackTrace();
-			}
 		}
 	}
 	
