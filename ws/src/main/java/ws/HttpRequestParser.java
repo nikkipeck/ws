@@ -1,12 +1,11 @@
 package ws;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.Socket;
 import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.StringTokenizer;
@@ -28,11 +27,9 @@ public class HttpRequestParser {
 	public void parseRequest() {
 		InputStream is = null;
 		Vector<String> headers = new Vector<String>();
-    	BufferedReader br = null;
+		BufferedInputStream bis = null;
     	String metver = null;
-    	try {
-    		is = socket.getInputStream();
-    		br = new BufferedReader(new InputStreamReader(is, StandardCharsets.ISO_8859_1));
+    	try {    		 
     		/*From rfc2616: Certain buggy HTTP/1.0 client implementations generate extra CRLF's
 	 		   after a POST request. To restate what is explicitly forbidden by the
 	 		   BNF, an HTTP/1.1 client MUST NOT preface or follow a request with an
@@ -42,7 +39,11 @@ public class HttpRequestParser {
 	 		*/
 	     	
 	     	//rfc2616: Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
-	     	metver = br.readLine(); //read the request line	     	
+    		is = socket.getInputStream();
+    		bis = new BufferedInputStream(is, 4096);
+	     	metver = stringifyBinaryLine(bis);
+	     	metver = URLDecoder.decode(metver, "UTF-8"); //remove escaped characters
+	     	System.out.println("metver " + metver);
     	}
     	catch(IOException ee) {
     		ee.printStackTrace();
@@ -85,10 +86,12 @@ public class HttpRequestParser {
     	
     	try {
 	    	//parse headers
-    		String headstr = br.readLine();
+    		String headstr = stringifyBinaryLine(bis);
+    		System.out.println("head " + headstr);
 	    	while(headstr != null && headstr.length() > 1) {
 	    		headers.add(headstr);
-	    		headstr = br.readLine();
+	    		headstr = stringifyBinaryLine(bis);
+	    		System.out.println("head " + headstr);
 	    	}
 	    	if(headers.size() > 0)
 	    		parseHeaders(headers);
@@ -99,7 +102,8 @@ public class HttpRequestParser {
 		    	return;
 		    }
 		    else if (method.equalsIgnoreCase("PUT")) {
-		    	responseObj.putResponse(decodeloc, is);
+		    	System.out.println("calling put");
+		    	responseObj.putResponse(decodeloc, bis);
 	    		return;
 		    }
 		    else if (method.equalsIgnoreCase("HEAD")) {
@@ -112,8 +116,8 @@ public class HttpRequestParser {
     	}
     	finally {
     		try {
-    			if(br != null)
-    				br.close();
+    			if(bis != null)
+    				bis.close();
     		}
     		catch(IOException sigh) {
     			sigh.printStackTrace();
@@ -157,5 +161,26 @@ public class HttpRequestParser {
 				headerHash.put(key, sb.toString());
 			}		
 		}		
+	}
+	
+	/*This is an attempt to recover from having to read character and binary data from the same stream
+	 * TODO: There must be a library out there that handles this better*/
+	private String stringifyBinaryLine(BufferedInputStream bis) throws IOException{
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		for(;;) {
+			int ch = bis.read();
+			if(ch == -1) //EOF
+				break;
+
+			//ignore returns, and break on new lines
+			if(ch == '\r' || ch == '\n') {
+				if(ch == '\r') {
+					bis.read();
+				}
+				break;
+			}
+			baos.write(ch);
+		}
+		return baos.toString();
 	}
 }
