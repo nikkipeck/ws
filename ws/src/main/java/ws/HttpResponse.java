@@ -1,5 +1,7 @@
 package ws;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -18,6 +20,8 @@ public class HttpResponse {
 	private StatusCode codes = new StatusCode();
 	private Socket socket = null;
 	private File contentFile = null;
+	
+	//TODO: put file path in properties file
 	
 	public HttpResponse(Socket socket) {
 		this.socket = socket;
@@ -57,7 +61,7 @@ public class HttpResponse {
 		}
 	}
 	
-	public void putResponse(String fileloc, InputStream is) {
+	public void putResponse(String fileloc, BufferedInputStream is) {
 		if(fileloc == null) {
 			sendResponse("400");
 			return;
@@ -71,8 +75,8 @@ public class HttpResponse {
 			return;
 		}
 		
+		BufferedOutputStream out = null;
 		boolean fileIsNew = false;
-		OutputStream out = null;
 		try {
 			if(modfileloc != null){
 				try
@@ -85,12 +89,12 @@ public class HttpResponse {
 				}
 			}
 			
-			out = new FileOutputStream(modfileloc);
-			byte[] bytebuff = new byte[4*1024];
-			for(int l; (l = is.read(bytebuff)) != -1;) {
-				out.write(bytebuff,  0, l);
-			}
-									
+			out = new BufferedOutputStream(new FileOutputStream(modfileloc));
+			System.out.println("new file " + fileIsNew);
+			is.transferTo(out); //TODO: this is blocking because is never gets an EOF
+			out.flush();
+			out.close();
+			
 			if(fileIsNew)
 				sendResponse("201");
 			else
@@ -102,8 +106,11 @@ public class HttpResponse {
 			sendResponse("400");
 		}
 		finally {
-			try {out.close();}
-            catch(Exception e){}
+			if(out != null) {
+				try {out.close();}
+				catch(Exception e) {}
+			}
+				
 		}
 	}
 	
