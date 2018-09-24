@@ -1,10 +1,6 @@
 package ws;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.Executors;
@@ -12,12 +8,11 @@ import java.util.concurrent.ExecutorService;
 
 //TODO: SecurityManager, set up security policy and checkaccept from host/port
 public class SimpleServer implements Runnable{
+	//TODO: move these to properties file
 	private static final int DEFAULT_PORT = 8080;
 	private static final int MAX_THREADS = 4;
 	private ServerSocket hsock;
 	private ExecutorService servicer;
-	
-	//TODO: start and stop server methods for testing
 	
 	public SimpleServer() {
 		this(DEFAULT_PORT);
@@ -30,8 +25,15 @@ public class SimpleServer implements Runnable{
 			servicer = Executors.newFixedThreadPool(MAX_THREADS);
 		}
 		catch(IOException ie) {
-			//TODO: write http response to return status code?
-			System.out.println(ie.getMessage());
+			ie.printStackTrace();
+		}
+		finally {
+			try {
+				hsock.close();
+			}
+			catch(IOException lastTry) {
+				lastTry.printStackTrace();
+			}
 		}
 	}
 	
@@ -48,6 +50,12 @@ public class SimpleServer implements Runnable{
 		finally {
 			if(!servicer.isShutdown())
 				servicer.shutdownNow(); //prevents waiting tasks from starting and attempts to stop currently executing tasks
+			try {
+				hsock.close();
+			}
+			catch(IOException ie) {
+				ie.printStackTrace();
+			}
 		}
 	}
 }
@@ -57,26 +65,16 @@ class ServiceHandler implements Runnable{
 	private final HttpRequestParser parser;
 	ServiceHandler(Socket socket){ 
 		this.socket = socket; 
-		parser = new HttpRequestParser();
+		parser = new HttpRequestParser(socket);
 	}
 	
 	public void run() {
-	    try {
-	    	InputStream is = socket.getInputStream();
-	    	String toWrite = parser.parseRequest(is);
-	    	
-	    	if(toWrite != null && toWrite.length() > 0) {
-		    	OutputStream out = socket.getOutputStream();
-		    	out.write(toWrite.getBytes());
-		    	out.flush();
-		    	
-		    	is.close();
-		    	socket.close();
-	    	}
-	    }
-	    catch(IOException ie) {
-	    	//TODO: handle this as elegantly as possible
-	    	ie.printStackTrace();
-	    }
+		try {
+		    parser.parseRequest();
+		    socket.close();
+		}
+		catch(IOException ioe) {
+			ioe.printStackTrace();
+		}
 	}
 }
