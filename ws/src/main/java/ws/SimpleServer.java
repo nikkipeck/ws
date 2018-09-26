@@ -6,62 +6,46 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.URL;
 import java.util.concurrent.Executors;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
 //TODO: SecurityManager, set up security policy and checkaccept from host/port
 public class SimpleServer implements Runnable{
-	private Properties config = new Properties();
-	private int default_port = -1;
-	private int max_threads = -1;
+	private static Properties config = new Properties();
+	private static int default_port = -1;
+	private static int max_threads = -1;
 	private ServerSocket hsock;
 	private ExecutorService servicer;
+	
+	static { 
+		InputStream in = null;
+		try {
+			File pfile = new File("./src/main/resources/config.properties");
+			in = new FileInputStream(pfile);
+			config.load(in);
+			in.close();
+		}
+		catch(IOException ioe) {
+			ioe.printStackTrace();
+		}
+		
+		if(config.containsKey("default_port"))
+			default_port = Integer.parseInt(config.getProperty("default_port"));
+		
+		if(config.containsKey("max_threads"))
+			max_threads = Integer.parseInt(config.getProperty("max_threads"));
+			
+		if(default_port < 0 || max_threads < 0)
+			throw new ExceptionInInitializerError("Invalid configuration. Please update application configuration file"); 
+    } 
 	
 	public SimpleServer() {
 		this(-1);
 	}
 	
 	public SimpleServer(int port){
-		try {
-			InputStream in = null;
-			try {
-				File pfile = new File("./src/main/resources/config.properties");
-				in = new FileInputStream(pfile);
-				config.load(in);
-				in.close();
-			}
-			catch(IOException ioe) {
-				ioe.printStackTrace();
-			}
-			
-			//if we couldn't get the file from the file system, try the classloader
-			if(in == null) {
-				try {
-					String filename = "main/resources/config.properties";
-					ClassLoader cl = getClass().getClassLoader();
-					URL res = Objects.requireNonNull(cl.getResource(filename),"Can't find configuration file " + filename);
-					
-					in = new FileInputStream(res.getFile());
-					config.load(in);
-					in.close();
-				}
-				catch(IOException ioex) {
-					ioex.printStackTrace();
-				}
-			}
-				
-			if(config.containsKey("default_port"))
-				default_port = Integer.parseInt(config.getProperty("default_port"));
-			
-			if(config.containsKey("max_threads"))
-				max_threads = Integer.parseInt(config.getProperty("max_threads"));
-				
-			if(default_port < 0 || max_threads < 0)
-				throw new Exception("Invalid configuration. Please update application configuration file");
-			
+		try {	
 			int use_port = 0;
 			if(port < 0)
 				use_port = default_port;
