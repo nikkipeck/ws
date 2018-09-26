@@ -7,64 +7,51 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
-import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Hashtable;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.Vector;
 
+import java.nio.charset.Charset;
+
 public class HttpRequestParser {
-	private Properties config = new Properties();
-	private String version = null;
+	private static Properties config = new Properties();
+	private static String version = null;
 	
 	HttpResponse responseObj = null;
 	private Hashtable<String,String> headerHash = new Hashtable<String,String>();
 	private Socket socket = null;
+	private String charset = "ISO-8859-1";
+	
+	static {
+		InputStream in = null;
+		try {
+			File pfile = new File("./src/main/resources/config.properties");
+			in = new FileInputStream(pfile);
+			config.load(in);
+			in.close();
+		}
+		catch(IOException ioe) {
+			ioe.printStackTrace();
+		}
+			
+		if(config.containsKey("version"))
+			version = config.getProperty("version");
+		
+		if(version == null)
+			throw new ExceptionInInitializerError("Invalid configuration. Please update application configuration file");
+	}
 	
 	public HttpRequestParser(Socket socket) {
-		try {
-			InputStream in = null;
-			try {
-				File pfile = new File("./src/main/resources/config.properties");
-				in = new FileInputStream(pfile);
-				config.load(in);
-				in.close();
-			}
-			catch(IOException ioe) {
-				ioe.printStackTrace();
-			}
-			
-			//if we couldn't get the file from the file system, try the classloader
-			if(in == null) {
-				try {
-					String filename = "main/resources/config.properties";
-					ClassLoader cl = getClass().getClassLoader();
-					URL res = Objects.requireNonNull(cl.getResource(filename),"Can't find configuration file " + filename);
-					
-					in = new FileInputStream(res.getFile());
-					config.load(in);
-					in.close();
-				}
-				catch(IOException ioex) {
-					ioex.printStackTrace();
-				}
-			}
-				
-			if(config.containsKey("version"))
-				version = config.getProperty("version");
-			
-			if(version == null)
-				throw new Exception("Invalid configuration. Please update application configuration file");
-		}
-		catch(Exception e) {
-			e.printStackTrace();
-		}	
-		
 		this.socket = socket;
-		responseObj = new HttpResponse(socket);
+		try {
+			responseObj = new HttpResponse(socket.getOutputStream());
+		}
+		catch(IOException ioe) {
+			ioe.printStackTrace();
+		}
 	}
 	
 	public void parseRequest() {
@@ -85,7 +72,7 @@ public class HttpRequestParser {
     		is = socket.getInputStream();
     		bis = new BufferedInputStream(is, 4096);
 	     	metver = stringifyBinaryLine(bis);
-	     	metver = URLDecoder.decode(metver, "UTF-8"); //remove escaped characters
+	     	metver = URLDecoder.decode(metver, charset); //remove escaped characters
     	}
     	catch(IOException ee) {
     		ee.printStackTrace();
@@ -136,7 +123,7 @@ public class HttpRequestParser {
 	    	if(headers.size() > 0)
 	    		parseHeaders(headers);
 	    	
-	    	String decodeloc = URLDecoder.decode(location, "UTF-8").replaceAll(" ",""); //decode url, ie: remove escaped spaces and remove whitespace
+	    	String decodeloc = URLDecoder.decode(location, charset).replaceAll(" ",""); //decode url, ie: remove escaped spaces and remove whitespace
 	    	if(method.equalsIgnoreCase("GET")) {
 		    	responseObj.getResponse(decodeloc);
 		    	return;
@@ -167,15 +154,21 @@ public class HttpRequestParser {
 	}
 	
 	/*rfc2616: Each header field consists
-   of a name followed by a colon (":") and the field value. Field names
-   are case-insensitive. The field value MAY be preceded by any amount
-   of LWS, though a single SP is preferred. Header fields can be
-   extended over multiple lines by preceding each extra line with at
-   least one SP or HT. Applications ought to follow "common form", where
-   one is known or indicated, when generating HTTP constructs, since
-   there might exist some implementations that fail to accept anything
-   beyond the common forms.*/
+	   of a name followed by a colon (":") and the field value. Field names
+	   are case-insensitive. The field value MAY be preceded by any amount
+	   of LWS, though a single SP is preferred. Header fields can be
+	   extended over multiple lines by preceding each extra line with at
+	   least one SP or HT. Applications ought to follow "common form", where
+	   one is known or indicated, when generating HTTP constructs, since
+	   there might exist some implementations that fail to accept anything
+	   beyond the common forms.
+	   Also RFC2616 HTTP/1.1 recipients MUST respect the charset label provided by the sender; and those 
+		user agents that have a provision to "guess" a charset MUST use the charset from the
+		 content-type field if they support that charset, rather than the
+		 recipient's preference, when initially displaying a document. See
+		 section 3.7.1.*/
 	private void parseHeaders(Vector<String> requests) {
+		String encodingKey = "accept-charset";
 		for(String r : requests) {
 			int colidx = r.indexOf(":");
 			String key;
@@ -188,6 +181,11 @@ public class HttpRequestParser {
 			if(colidx > 0)
 				value = r.substring(colidx+1).trim();
 			
+			if(key.equalsIgnoreCase(encodingKey)) {
+				setCharset(value);
+				responseObj.setEncoding(charset);
+			}
+			
 			if(!headerHash.containsKey(key)) {
 				headerHash.put(key,  value);
 			}
@@ -198,8 +196,8 @@ public class HttpRequestParser {
 				sb.append(",");
 				sb.append(value);
 				headerHash.put(key, sb.toString());
-			}		
-		}		
+			}
+		}
 	}
 	
 	/*This is an attempt to recover from having to read character and binary data from the same stream
@@ -220,6 +218,62 @@ public class HttpRequestParser {
 			}
 			baos.write(ch);
 		}
-		return baos.toString();
+		return baos.toString(charset);
+	}
+	
+	//TODO: again, must be a library to do this
+	private void setCharset(String charsetHeader) {
+		/*rfc2616 Accept-Charset = "Accept-Charset" ":"1#( ( charset | "*" )[ ";" "q" "=" qvalue ] )
+		* matches every character set (including ISO-8859-1) which is not mentioned elsewhere in accept-charset field
+		If no "*" is present in an Accept-Charset field, then all character sets not explicitly mentioned get a quality value of 0, except for ISO-8859-1, which gets
+		a quality value of 1 if not explicitly mentioned.
+		Accept-Charset: iso-8859-5, unicode-1-1;q=0.8*/
+		if(charsetHeader.indexOf("*") > 0) 
+			return; //using ISO-8859-1, ignoring quality value
+		
+		if(charsetHeader.indexOf(",") > 0){ //multiple possible charsets
+			Double hiq = -1.0;
+			String hics = null;
+			StringTokenizer chop = new StringTokenizer(charsetHeader,",");
+			while (chop.hasMoreElements()) {
+    	        String cs = chop.nextToken();
+    	        int semi = cs.indexOf(";"); //quality score
+    	        if(semi > 0) {
+    	        	String c = cs.substring(0, semi);
+    	        	String q = cs.substring(semi+1);
+    	        	try {
+    	        		int idx = q.indexOf("=");
+    	        		if(idx > 0) {
+    	        			String subq = q.substring(idx+1);
+    	        			Double qv = Double.parseDouble(subq);
+		    	        	
+		    	        	if(qv > hiq && Charset.isSupported(cs)) {
+		    	        		hiq = qv;
+		    	        		hics = c; //this is the highest quality charset so far
+		    	        	}
+    	        		}
+    	        	}
+    	        	catch(Exception e) {
+    	        		e.printStackTrace();
+    	        		responseObj.sendResponse("406"); //according to rfc2616
+    	        	}
+	    	    }
+    	        else { //no quality score, defaults to 1
+    	        	if(Charset.isSupported(cs)) {
+    	        		hiq = 1.0;
+    	        		hics = cs;
+    	        	}
+    	        }
+    	    }
+    	    if(hics == null)
+    	    	responseObj.sendResponse("406"); //according to rfc2616
+    	    else
+    	    	charset = hics;			
+		}
+		else if(!Charset.isSupported(charsetHeader))
+			responseObj.sendResponse("406"); //according to rfc2616
+		else
+			charset = charsetHeader; //charsetHeader is one value and is supported
+		
 	}
 }
