@@ -4,16 +4,19 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.util.Properties;
 import java.util.Vector;
 
 import javax.activation.MimetypesFileTypeMap;
+import javax.xml.bind.DatatypeConverter;
 
 public class HttpResponse {
 	private Vector<String> headers = new Vector<String>();
@@ -54,26 +57,39 @@ public class HttpResponse {
 		this.charset = charset;
 	}
 	
-	public void getResponse(String fileloc) {
+	public void getResponse(String fileloc, String match) {
 		if(fileloc == null) {			
 			sendResponse("400");
 			return;
 		}
 		
 		try {
-			String modfileloc = null;
+			String fileLocation = null;
 			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0) //path
-				modfileloc = "." + fileloc.substring(1); //trim first / and add a dot
+				fileLocation = "." + fileloc.substring(1); //trim first / and add a dot
 			else if(fileloc.startsWith("/") && fileloc.length() > 1) //file
-				modfileloc = fileroot + fileloc;
+				fileLocation = fileroot + fileloc;
 			else if(fileloc.startsWith("/") && fileloc.length() == 1) //naked
-				modfileloc = fileroot + "getfile.txt";
+				fileLocation = fileroot + "getfile.txt"; 
 			
-			if(modfileloc != null) {
-				String mimetype = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(modfileloc);
-				headers.add("Content-Type: " + mimetype + "\r\n");
-				headers.add("Content-Length: " + new File(modfileloc).length() + "\r\n");
-				contentFile = new File(modfileloc);
+			if(fileLocation != null) {
+				String mimetype = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(fileLocation);
+				
+				byte[] b = Files.readAllBytes(Paths.get(fileLocation));
+	        	byte[] hash = MessageDigest.getInstance("MD5").digest(b);
+	        	String hex = DatatypeConverter.printHexBinary(hash); //convert to hex
+	        	
+		        headers.add("Content-Type: " + mimetype + "\r\n");
+				headers.add("Content-Length: " + new File(fileLocation).length() + "\r\n");
+				headers.add("ETag: " + hex + "\r\n");
+				
+				if(match != null && match.contains(hex)) {
+					sendResponse("304");
+					return;
+				}
+				
+				contentFile = new File(fileLocation);
+				
 				sendResponse("200");
 				return;
 			}
@@ -94,9 +110,9 @@ public class HttpResponse {
 			return;
 		}
 		
-		String modfileloc = null;
+		String fileLocation = null;
 		if(fileloc.startsWith("/") && fileloc.length() > 1) //file
-			modfileloc = "./src/main/resources/files" + fileloc;
+			fileLocation = "./src/main/resources/files" + fileloc;
 		else {
 			sendResponse("400");
 			return;
@@ -105,18 +121,13 @@ public class HttpResponse {
 		BufferedOutputStream out = null;
 		boolean fileIsNew = false;
 		try {
-			if(modfileloc != null){
-				try
-				{
-					InputStream in = new FileInputStream(modfileloc);
-					in.close();
-				}
-				catch(FileNotFoundException fnf) {
+			if(fileLocation != null){
+				File f = new File(fileLocation);
+				if(!f.exists())
 					fileIsNew = true;
-				}
 			}
 			
-			out = new BufferedOutputStream(new FileOutputStream(modfileloc));
+			out = new BufferedOutputStream(new FileOutputStream(fileLocation));
 			//is.transferTo(out); //TODO: this is blocking because is never gets an end of stream
 			byte[] buffer = new byte[4 * 1024];
 			while (is.available() > 0) {
@@ -143,25 +154,37 @@ public class HttpResponse {
 		}
 	}
 	
-	public void headResponse(String fileloc) {
+	public void headResponse(String fileloc, String match) {
 		if(fileloc == null) {			
 			sendResponse("400");
 			return;
 		}
 		
 		try {
-			String modfileloc = null;
+			String fileLocation = null;
 			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0) //path
-				modfileloc = "." + fileloc.substring(1); //trim first / and add a dot
+				fileLocation = "." + fileloc.substring(1); //trim first / and add a dot
 			else if(fileloc.startsWith("/") && fileloc.length() > 1) //file
-				modfileloc = "./src/main/resources/files" + fileloc;
+				fileLocation = "./src/main/resources/files" + fileloc;
 			else if(fileloc.startsWith("/") && fileloc.length() == 1) //naked
-				modfileloc = "./src/main/resources/files/getfile.txt";
+				fileLocation = "./src/main/resources/files/getfile.txt";
 			
-			if(modfileloc != null) {
-				String mimetype = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(modfileloc);
+			if(fileLocation != null) {
+				String mimetype = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(fileLocation);
+				
+				byte[] b = Files.readAllBytes(Paths.get(fileLocation));
+	        	byte[] hash = MessageDigest.getInstance("MD5").digest(b);
+	        	String hex = DatatypeConverter.printHexBinary(hash); //convert to hex
+	        	
 				headers.add("Content-Type: " + mimetype + "\r\n");
-				headers.add("Content-Length: " + new File(modfileloc).length() + "\r\n");
+				headers.add("Content-Length: " + new File(fileLocation).length() + "\r\n");
+				headers.add("ETag: " + hex + "\r\n");
+				
+				if(match != null && match.contains(hex)) {
+					sendResponse("304");
+					return;
+				}
+				
 				/*rfc2616 The HEAD method is identical to GET except that the server MUST NOT
 				   return a message-body in the response, so no body on this one*/				
 				sendResponse("200");
@@ -198,9 +221,11 @@ public class HttpResponse {
 	        ps.print(respbuff.toString()); //this contains headers
 	        ps.flush();
 	        
-	        if(contentFile != null && contentFile.length() > 0) {
-		        in = new FileInputStream(contentFile);
-		        in.transferTo(ps);
+	        if(!code.equals("304")) { //do not send file in case of an unmodified response
+		        if(contentFile != null && contentFile.length() > 0) {
+		        	in = new FileInputStream(contentFile);
+			        in.transferTo(ps);
+		        }
 	        }
 	        
 	        ps.flush();
