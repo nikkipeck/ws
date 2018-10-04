@@ -125,7 +125,12 @@ public class HttpRequestParser {
 	    	
 	    	String decodeloc = URLDecoder.decode(location, charset).replaceAll(" ",""); //decode url, ie: remove escaped spaces and remove whitespace
 	    	if(method.equalsIgnoreCase("GET")) {
-		    	responseObj.getResponse(decodeloc);
+	    		//check headerHash for if-none-match
+	    		String match = null;
+	    		if(headerHash.containsKey("If-None-Match"))
+	    			match = headerHash.get("If-None-Match");
+	    		
+		    	responseObj.getResponse(decodeloc, match);
 		    	return;
 		    }
 		    else if (method.equalsIgnoreCase("PUT")) {
@@ -133,7 +138,12 @@ public class HttpRequestParser {
 	    		return;
 		    }
 		    else if (method.equalsIgnoreCase("HEAD")) {
-		    	responseObj.headResponse(decodeloc);
+		    	//check headerHash for if-none-match
+		    	String match = null;
+	    		if(headerHash.containsKey("If-None-Match"))
+	    			match = headerHash.get("If-None-Match");
+	    		
+		    	responseObj.headResponse(decodeloc, match);
 		    	return;
 		    }
     	}
