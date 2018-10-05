@@ -2,15 +2,17 @@ package ws;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 
 import java.net.Socket;
-import java.nio.charset.Charset;
 import java.nio.file.Files;
-import java.util.List;
+import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
 
@@ -181,38 +183,46 @@ public class wsSystemTest {
 	        stream.println();
 	        stream.flush();
 	        
-	        BufferedReader br = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), charset));
-
-			String text = br.readLine();
+	        BufferedInputStream bis = new BufferedInputStream(clientSocket.getInputStream(), 4096);
+			String text = stringifyBinaryLine(bis);
 			if(!text.equals("HTTP/1.1 200 OK"))
 				fail("Unexpected response " + text);
 			
-			String header1 = br.readLine();
-			System.out.println("content-type " + header1);
+			String contentType = stringifyBinaryLine(bis);
+			if(!contentType.contains("application/octet-stream"))
+				fail("Invalid content-type: " + contentType);
 			
-			String header2 = br.readLine();
-			System.out.println("content-length " + header2);
+			String contentLength =stringifyBinaryLine(bis);
+			if(!contentLength.contains("2048"))
+				fail("Invalid content-length: " + contentLength);
 			
-			String etag = br.readLine();
-			System.out.println("etag " + etag);
+			String etag = stringifyBinaryLine(bis);
+			if(!etag.contains("0D3E6A7A4E6B167967802A7D5F908C9B"))
+				fail("Invalid ETag: " + etag);
 			
-			String connection = br.readLine();
-			System.out.println("connection " + connection);
+			String connection = stringifyBinaryLine(bis);
+			if(connection == null || connection.equals(""))
+				fail("Empty connection header");
 			
-			String emptyLine = br.readLine();
-			System.out.println("emptyLine " + emptyLine);
+			String emptyLine = stringifyBinaryLine(bis);
+			if(!emptyLine.equals(""))
+				fail("Malformatted response, line shoud be empty: " + emptyLine);
 			
-			//TODO: this assertion has a number of problems. I'm not comparing byte data, but strings of byte data and only the first
-			//string read from the file system.
-			String payloadStr = br.readLine();
-			System.out.println("bytes from server " + payloadStr);
+			//go get the payload
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			for(;;) {
+				int ch = bis.read();
+				if(ch == -1) //EOF
+					break;
+				baos.write(ch);				
+			}
+
+			byte[] payload = baos.toByteArray();
 			
 			File fromFs = new File("./src/main/resources/testBin.bin");
-			List<String> fls = Files.readAllLines(fromFs.toPath(), Charset.forName(charset));
-			String fsPayload = fls.get(0);
-			System.out.println("fsbytes " + fsPayload);
+			byte[] bs = Files.readAllBytes(fromFs.toPath());
 			
-			assertEquals(payloadStr, fsPayload);
+			assertTrue(Arrays.equals(payload, bs));
 			
 	        stream.close();
 	        clientSocket.close();
@@ -294,5 +304,24 @@ public class wsSystemTest {
 		catch(Exception e) {
 			fail(e.getMessage());
 		}
+	}
+	
+	private String stringifyBinaryLine(BufferedInputStream bis) throws IOException{
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		for(;;) {
+			int ch = bis.read();
+			if(ch == -1) //EOF
+				break;
+
+			//ignore returns, and break on new lines
+			if(ch == '\r' || ch == '\n') {
+				if(ch == '\r') {
+					bis.read();
+				}
+				break;
+			}
+			baos.write(ch);
+		}
+		return baos.toString(charset);
 	}
 }
