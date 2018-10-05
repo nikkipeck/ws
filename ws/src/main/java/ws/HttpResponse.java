@@ -57,16 +57,22 @@ public class HttpResponse {
 		this.charset = charset;
 	}
 	
+	public String getEncoding() {
+		return charset;
+	}
+	
 	public void getResponse(String fileloc, String match) {
 		if(fileloc == null) {			
 			sendResponse("400");
 			return;
 		}
 		
+		//TODO: support test resource files
+		
 		try {
 			String fileLocation = null;
-			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0) //path
-				fileLocation = "." + fileloc.substring(1); //trim first / and add a dot
+			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0)  //path
+				fileLocation = "." + fileloc; //add a dot
 			else if(fileloc.startsWith("/") && fileloc.length() > 1) //file
 				fileLocation = fileroot + fileloc;
 			else if(fileloc.startsWith("/") && fileloc.length() == 1) //naked
@@ -160,10 +166,12 @@ public class HttpResponse {
 			return;
 		}
 		
+		//TODO: support test resource files
+		
 		try {
 			String fileLocation = null;
 			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0) //path
-				fileLocation = "." + fileloc.substring(1); //trim first / and add a dot
+				fileLocation = "." + fileloc; //add a dot
 			else if(fileloc.startsWith("/") && fileloc.length() > 1) //file
 				fileLocation = "./src/main/resources/files" + fileloc;
 			else if(fileloc.startsWith("/") && fileloc.length() == 1) //naked
