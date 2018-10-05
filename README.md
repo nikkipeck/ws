@@ -23,3 +23,10 @@ Helper class to return the appropriate code and message in responses
 Future development:
 Implement SecurityManager
 Modularity for ease and completeness in testing
+Fix binary comparison test
+
+Starting the server is relatively easy with the following lines:
+SimpleServer ss = new SimpleServer(PORT);
+ss.run();
+
+or run ws.src.test.java.ws.SimpleServerStartTest
