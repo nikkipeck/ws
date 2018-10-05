@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
@@ -53,6 +54,7 @@ public class SimpleServer implements Runnable{
 				use_port = port;
 			
 			hsock = new ServerSocket(use_port);
+			
 			//Creates a thread pool that reuses a fixed number of threads operating off a shared unbounded queue.
 			servicer = Executors.newFixedThreadPool(max_threads);
 		}
@@ -68,39 +70,61 @@ public class SimpleServer implements Runnable{
 	
 	public void run() {
 		try {
-			while(true) { //just run forever
+			for(;;) {
 				//Executes the given task sometime in the future.
 				servicer.execute(new ServiceHandler(hsock.accept()));
+				 if (Thread.currentThread().isInterrupted()) break;
 			}
 		}
-		catch(IOException ioe) {
-			ioe.printStackTrace();
+		catch(Exception ee) {
+			ee.printStackTrace();
 			servicer.shutdown(); //will execute previously submitted tasks before going away
 		}
 		finally {
 			if(!servicer.isShutdown())
 				servicer.shutdownNow(); //prevents waiting tasks from starting and attempts to stop currently executing tasks
-			try {
-				hsock.close();
-			}
-			catch(IOException ie) {
-				ie.printStackTrace();
-			}
+			try {hsock.close();	}
+			catch(IOException ie) {ie.printStackTrace();}
+		}
+	}
+	
+	public void shutdown() {
+		if(!hsock.isClosed()) {
+			try {hsock.close();}
+			catch(IOException ee) {}
+		}
+		
+		servicer.shutdownNow();
+		try {
+		    if (!servicer.awaitTermination(100, TimeUnit.MICROSECONDS)) {
+		        System.out.println("Still waiting...");
+		        System.exit(0);
+		    }
+		    System.out.println("Exiting normally...");
+		}
+		catch(InterruptedException ie) {
+			ie.printStackTrace();
 		}
 	}
 }
 
 class ServiceHandler implements Runnable{
 	private final Socket socket;
-	private final HttpRequestParser parser;
+	private HttpRequestParser parser = null;
 	ServiceHandler(Socket socket){ 
 		this.socket = socket; 
-		parser = new HttpRequestParser(socket);
+		try {
+			parser = new HttpRequestParser(socket.getOutputStream());
+		}
+		catch(IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public void run() {
 		try {
-		    parser.parseRequest();
+			if(parser != null)
+				parser.parseRequest(socket.getInputStream());
 		    socket.close();
 		}
 		catch(IOException ioe) {
