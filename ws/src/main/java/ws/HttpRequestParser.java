@@ -6,7 +6,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.Socket;
+import java.io.OutputStream;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Hashtable;
@@ -22,7 +22,7 @@ public class HttpRequestParser {
 	
 	HttpResponse responseObj = null;
 	private Hashtable<String,String> headerHash = new Hashtable<String,String>();
-	private Socket socket = null;
+	//private Socket socket = null;
 	private String charset = "ISO-8859-1";
 	
 	static {
@@ -44,18 +44,12 @@ public class HttpRequestParser {
 			throw new ExceptionInInitializerError("Invalid configuration. Please update application configuration file");
 	}
 	
-	public HttpRequestParser(Socket socket) {
-		this.socket = socket;
-		try {
-			responseObj = new HttpResponse(socket.getOutputStream());
-		}
-		catch(IOException ioe) {
-			ioe.printStackTrace();
-		}
+	public HttpRequestParser(OutputStream out) {
+		//this.socket = socket;
+		responseObj = new HttpResponse(out);
 	}
 	
-	public void parseRequest() {
-		InputStream is = null;
+	public void parseRequest(InputStream is) {
 		Vector<String> headers = new Vector<String>();
 		BufferedInputStream bis = null;
     	String metver = null;
@@ -69,7 +63,6 @@ public class HttpRequestParser {
 	 		*/
 	     	
 	     	//rfc2616: Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
-    		is = socket.getInputStream();
     		bis = new BufferedInputStream(is, 4096);
 	     	metver = stringifyBinaryLine(bis);
 	     	metver = URLDecoder.decode(metver, charset); //remove escaped characters
@@ -239,7 +232,7 @@ public class HttpRequestParser {
 		a quality value of 1 if not explicitly mentioned.
 		Accept-Charset: iso-8859-5, unicode-1-1;q=0.8*/
 		if(charsetHeader.indexOf("*") > 0) 
-			return; //using ISO-8859-1, ignoring quality value
+			return; //using ISO-8859-1, ignoring quality value(s)
 		
 		if(charsetHeader.indexOf(",") > 0){ //multiple possible charsets
 			Double hiq = -1.0;
