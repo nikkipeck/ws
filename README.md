@@ -30,3 +30,14 @@ SimpleServer ss = new SimpleServer(PORT);
 ss.run();
 
 or run ws.src.test.java.ws.SimpleServerStartTest
+
+Some benchmarking done with apache bench:
+
+ab -n 2000 -c 100 http://localhost:8081/IMG_0595.JPG (867 KB)
+2.461 ms mean request time, 0 failed requests
+
+ab -n 10000 -c 200 http://localhost:8081/apache-tomcat-8.5.32.exe (9.41 MB)
+170.358 ms mean request time, 0 failed requests
+
+ab -n 10000 -c 200 http://localhost:8081/strawberry-perl.msi (97 MB)
+395.795 mean request time, 0 failed requests
