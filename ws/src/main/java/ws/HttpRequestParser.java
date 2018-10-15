@@ -1,12 +1,12 @@
 package ws;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Hashtable;
@@ -22,7 +22,6 @@ public class HttpRequestParser {
 	
 	HttpResponse responseObj = null;
 	private Hashtable<String,String> headerHash = new Hashtable<String,String>();
-	//private Socket socket = null;
 	private String charset = "ISO-8859-1";
 	
 	static {
@@ -44,8 +43,7 @@ public class HttpRequestParser {
 			throw new ExceptionInInitializerError("Invalid configuration. Please update application configuration file");
 	}
 	
-	public HttpRequestParser(OutputStream out) {
-		//this.socket = socket;
+	public HttpRequestParser(BufferedOutputStream out) {
 		responseObj = new HttpResponse(out);
 	}
 	
@@ -87,6 +85,8 @@ public class HttpRequestParser {
     	    	method = tokens.get(0);
 	    		location = tokens.get(1);
 	    		httpver = tokens.get(2);
+	    		//System.out.println("method " + method + " location " + location + " version " + httpver); //useful debug line
+
 	    		//there must be all three in a request
 		    	if(method == null || location == null || httpver == null) {
 		    		responseObj.sendResponse("400");
