@@ -5,13 +5,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ServerSocket;
-import java.net.Socket;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
-//TODO: SecurityManager, set up security policy and checkaccept from host/port
 public class SimpleServer implements Runnable{
 	private static Properties config = new Properties();
 	private static int default_port = -1;
@@ -39,20 +37,20 @@ public class SimpleServer implements Runnable{
 			
 		if(default_port < 0 || max_threads < 0)
 			throw new ExceptionInInitializerError("Invalid configuration. Please update application configuration file"); 
-    } 
+    }
 	
 	public SimpleServer() {
 		this(-1);
 	}
 	
 	public SimpleServer(int port){
-		try {	
-			int use_port = 0;
-			if(port < 0)
-				use_port = default_port;
-			else
-				use_port = port;
-			
+		int use_port = 0;
+		if(port < 0)
+			use_port = default_port;
+		else
+			use_port = port;
+		
+		try {
 			hsock = new ServerSocket(use_port);
 			
 			//Creates a thread pool that reuses a fixed number of threads operating off a shared unbounded queue.
@@ -61,6 +59,7 @@ public class SimpleServer implements Runnable{
 		catch(IOException ie) {
 			try {hsock.close();}
 			catch(Exception e) {}
+			shutdown(servicer);
 			ie.printStackTrace();
 		}
 		catch(Exception e) {
@@ -73,12 +72,11 @@ public class SimpleServer implements Runnable{
 			for(;;) {
 				//Executes the given task sometime in the future.
 				servicer.execute(new ServiceHandler(hsock.accept()));
-				 if (Thread.currentThread().isInterrupted()) break;
 			}
 		}
 		catch(Exception ee) {
+			shutdown(servicer);
 			ee.printStackTrace();
-			servicer.shutdown(); //will execute previously submitted tasks before going away
 		}
 		finally {
 			if(!servicer.isShutdown())
@@ -88,47 +86,29 @@ public class SimpleServer implements Runnable{
 		}
 	}
 	
-	public void shutdown() {
+	public int getSocketPort() {
+		if(hsock != null)
+			return hsock.getLocalPort();
+		return -1;
+	}
+	
+	public void shutdown(ExecutorService servicer) {
 		if(!hsock.isClosed()) {
 			try {hsock.close();}
 			catch(IOException ee) {}
 		}
 		
-		servicer.shutdownNow();
+		servicer.shutdown(); //try a graceful shutdown		
 		try {
-		    if (!servicer.awaitTermination(100, TimeUnit.MICROSECONDS)) {
-		        System.out.println("Still waiting...");
-		        System.exit(0);
+			if (!servicer.awaitTermination(45, TimeUnit.SECONDS)) {
+				servicer.shutdownNow(); //really shut it down
+				if(!servicer.awaitTermination(45, TimeUnit.SECONDS))
+					System.err.println("Servicer did not end");
 		    }
-		    System.out.println("Exiting normally...");
 		}
 		catch(InterruptedException ie) {
-			ie.printStackTrace();
-		}
-	}
-}
-
-class ServiceHandler implements Runnable{
-	private final Socket socket;
-	private HttpRequestParser parser = null;
-	ServiceHandler(Socket socket){ 
-		this.socket = socket; 
-		try {
-			parser = new HttpRequestParser(socket.getOutputStream());
-		}
-		catch(IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	public void run() {
-		try {
-			if(parser != null)
-				parser.parseRequest(socket.getInputStream());
-		    socket.close();
-		}
-		catch(IOException ioe) {
-			ioe.printStackTrace();
+			servicer.shutdownNow();
+			Thread.currentThread().interrupt();
 		}
 	}
 }
