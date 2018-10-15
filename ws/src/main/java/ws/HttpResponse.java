@@ -7,7 +7,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -20,14 +19,15 @@ import javax.xml.bind.DatatypeConverter;
 
 public class HttpResponse {
 	private Vector<String> headers = new Vector<String>();
-	private StatusCode codes = new StatusCode();
-	private OutputStream socketOut = null;
+	private BufferedOutputStream socketOut = null;
 	private File contentFile = null;
 	
 	private static Properties config = new Properties();
 	private static String fileroot = null;
 	
-	protected String charset = "ISO-8859-1";
+	private String charset = "ISO-8859-1";
+	
+	private StatusCode codes = new StatusCode();
 	
 	static {
 		InputStream in = null;
@@ -49,7 +49,7 @@ public class HttpResponse {
 	
 	}
 	
-	public HttpResponse(OutputStream socketOut) {		
+	public HttpResponse(BufferedOutputStream socketOut) {		
 		this.socketOut = socketOut;
 	}
 	
@@ -66,8 +66,6 @@ public class HttpResponse {
 			sendResponse("400");
 			return;
 		}
-		
-		//TODO: support test resource files
 		
 		try {
 			String fileLocation = null;
@@ -95,7 +93,7 @@ public class HttpResponse {
 				}
 				
 				contentFile = new File(fileLocation);
-				
+
 				sendResponse("200");
 				return;
 			}
@@ -166,8 +164,6 @@ public class HttpResponse {
 			return;
 		}
 		
-		//TODO: support test resource files
-		
 		try {
 			String fileLocation = null;
 			if (fileloc.startsWith("/") && fileloc.indexOf("/",1) > 0) //path
@@ -194,7 +190,7 @@ public class HttpResponse {
 				}
 				
 				/*rfc2616 The HEAD method is identical to GET except that the server MUST NOT
-				   return a message-body in the response, so no body on this one*/				
+				   return a message-body in the response, so no body on this one*/
 				sendResponse("200");
 				return;
 			}
@@ -223,7 +219,7 @@ public class HttpResponse {
         respbuff.append("\r\n"); //end headers
         
         PrintStream ps = null;
-        FileInputStream in = null;
+        BufferedInputStream in = null;
         try {
 	        ps = new PrintStream(socketOut, true, charset);
 	        ps.print(respbuff.toString()); //this contains headers
@@ -231,16 +227,13 @@ public class HttpResponse {
 	        
 	        if(!code.equals("304")) { //do not send file in case of an unmodified response
 		        if(contentFile != null && contentFile.length() > 0) {
-		        	in = new FileInputStream(contentFile);
+		        	in = new BufferedInputStream(new FileInputStream(contentFile), 4096);
 			        in.transferTo(ps);
 		        }
 	        }
 	        
 	        ps.flush();
-	        ps.close();
-	        
 	        socketOut.flush();
-	        socketOut.close();
         }
         catch(IOException ioe) {
         	ioe.printStackTrace();
