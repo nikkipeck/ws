@@ -41,3 +41,11 @@ ab -n 10000 -c 200 http://localhost:8081/apache-tomcat-8.5.32.exe (9.41 MB)
 
 ab -n 10000 -c 200 http://localhost:8081/strawberry-perl.msi (97 MB)
 395.795 mean request time, 0 failed requests
+
+Testing:
+All test files are located in /src/test/java/ws
+wsSystemTest - a full functionality test
+SimpleServerUnitTest - test that a server is set up on the correct port, default or specified
+HttpRequestParserUnitTest - requires SimpleServerStartTest to run, will test full parsing of http requests and responses
+ServiceHandlerUnitTest - requres SimpleServerStartTest to run, will test ServiceHandler initialization
+SimpleServerStartTest - will start the web server and handle requests from 3rd party programs (i.e. Postman), and from internal unit tests. 
