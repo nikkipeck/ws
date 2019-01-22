@@ -12,6 +12,9 @@ The server listens on http://localhost:8080 by default, but will also accept a d
 
 *
 
+src.main.java.ws.SimpleServerStarter.java
+Main class that will start a SimpleServer instance
+
 src.main.java.ws.SimpleServer.java
 Creates a ServerSocket on a default (8080) or specified port. Runs an Excecutor service on socket.accept() which hands off parsing of http requests.
 
@@ -31,11 +34,9 @@ Modularity for ease and completeness in testing
 
 *
 
-The server can be started with the following lines:
-SimpleServer ss = new SimpleServer(PORT);
-ss.run();
-
-or run ws.src.test.java.ws.SimpleServerStartTest
+The server can be started by the following classes:
+ws.src.main.java.ws.SimplerServerStarter (Main class)
+ws.src.test.java.ws.SimpleServerStartTest (Test class)
 
 *
 
@@ -60,6 +61,8 @@ wsSystemTest - a full functionality test
 SimpleServerUnitTest - test that a server is set up on the correct port, default or specified
 
 HttpRequestParserUnitTest - requires SimpleServerStartTest to run, will test full parsing of http requests and responses
+
+HttpResponseUnitTest - this is a basic uncaught excpetion test for the HttpResponse object
 
 ServiceHandlerUnitTest - requres SimpleServerStartTest to run, will test ServiceHandler initialization
 
