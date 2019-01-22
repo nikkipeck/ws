@@ -28,9 +28,13 @@ src.main.java.ws.StatusCodes.java
 Helper class to return the appropriate code and message in responses
 
 *
+Logging:
+Logging is accomplished with a simple java.util.logging.Logger implementation. Log files are written to a directory specified in config.properties. 
+*
 
 Future development:
 Modularity for ease and completeness in testing
+Sustainable logging implementation (Apache Commons, or Log4J)
 
 *
 
