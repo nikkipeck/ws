@@ -1,2 +1,0 @@
-This file was served from my simple web server.
-Have a lovely day!
