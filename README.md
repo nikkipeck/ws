@@ -35,6 +35,7 @@ Logging is accomplished with a simple java.util.logging.Logger implementation. L
 Future development:
 Modularity for ease and completeness in testing
 Sustainable logging implementation (Apache Commons, or Log4J)
+test suite, which will start a server instance and cycle through all of the unit tests
 
 *
 
@@ -70,4 +71,4 @@ HttpResponseUnitTest - this is a basic uncaught excpetion test for the HttpRespo
 
 ServiceHandlerUnitTest - requres SimpleServerStartTest to run, will test ServiceHandler initialization
 
-SimpleServerStartTest - will start the web server and handle requests from 3rd party programs (i.e. Postman), and from internal unit tests. 
+SimpleServerStartTest - will start the web server and handle requests from 3rd party programs (i.e. Postman), and from internal unit tests.
