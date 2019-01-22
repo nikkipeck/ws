@@ -3,6 +3,8 @@ package ws;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.net.SocketTimeoutException;
+
 public class SimpleServerStartTest {
 	public static final int PORT = 8081;
 	
@@ -14,7 +16,11 @@ public class SimpleServerStartTest {
 			ss.run();
 		}
 		catch(ExceptionInInitializerError eiie) {
-			eiie.printStackTrace();
+			fail(eiie);
+		}
+		catch(Exception any) {
+			if(!(any instanceof SocketTimeoutException))
+				fail(any);
 		}
 	}
 }
