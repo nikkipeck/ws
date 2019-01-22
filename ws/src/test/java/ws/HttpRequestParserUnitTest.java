@@ -3,6 +3,7 @@ package ws;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
@@ -17,7 +18,8 @@ public class HttpRequestParserUnitTest {
 			clientSocket = new Socket("localhost",8081);
 			
 			PrintStream printer = new PrintStream(clientSocket.getOutputStream(), true); //autoflush
-			printer.println("GET /src/main/resources/testFile.txt HTTP/1.1");
+			//printer.println("GET /src/main/resources/testFile.txt HTTP/1.1"); //get file from path
+			printer.println("GET /testFile.txt HTTP/1.1"); //get file from fileroot
 			printer.println("If-None-Match: \"eowowief\",\"5B01F0F8DE85CFE5166F0F07DC09591A\"");
 			printer.println("accept-charset: UTF-8");
 			printer.println(); //properly formatted request will include an empty line after headers
@@ -55,7 +57,7 @@ public class HttpRequestParserUnitTest {
 			
 			BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
 			String response = reader.readLine();
-			if(!(response.equals("HTTP/1.1 200 OK")))
+			if(!(response.equals("HTTP/1.1 200 OK") || response.equals("HTTP/1.1 201 Created")))
 				fail("invalid response " + response);			
 		}
 		catch(Exception e) {
@@ -75,7 +77,7 @@ public class HttpRequestParserUnitTest {
 			clientSocket = new Socket("localhost",8081);
 			
 			PrintStream printer = new PrintStream(clientSocket.getOutputStream(), true); //autoflush
-			printer.println("HEAD /src/main/resources/testFile.txt HTTP/1.1");
+			printer.println("HEAD /testFile.txt HTTP/1.1");
 			printer.println("If-None-Match: \"eowowief\",\"5B01F0F8DE85CFE5166F0F07DC09591A\"");
 			printer.println("accept-charset: UTF-8");
 			printer.println(); //properly formatted request will include an empty line after headers
@@ -110,8 +112,8 @@ public class HttpRequestParserUnitTest {
 			if(payload != null)
 				fail("Payload should be null for HEAD request: " + payload);
 		}
-		catch(Exception e) {
-			fail(e.getMessage());
+		catch(IOException e) {
+			fail(e);
 		}
 		finally {
 			if(clientSocket != null)
