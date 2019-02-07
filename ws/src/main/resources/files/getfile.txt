@@ -1,2 +1,4 @@
 This file was served from my simple web server.
+This is a generic file, if you requested a different file from the server, there was an error.
+Please try again.
 Have a lovely day!
