@@ -10,6 +10,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+/*Standalone that tests character encoding, GET, PUT, and HEAD requests.
+ Relies on files from resources: testfile.txt
+ Writes putfile.html to configured location*/
+
 public class ServiceHandlerIntegrationTest {
 	private static int PORT = 8081;
 	private static SimpleServer ss;
