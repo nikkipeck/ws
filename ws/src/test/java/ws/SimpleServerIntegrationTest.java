@@ -6,6 +6,8 @@ import java.net.SocketTimeoutException;
 
 import org.junit.jupiter.api.Test;
 
+/*Standalone that will start a server on port 8080 and wait for timeout. It will start a server on 8083 and wait for timeout.*/
+
 public class SimpleServerIntegrationTest {
 	@Test
 	void testDefault() {
