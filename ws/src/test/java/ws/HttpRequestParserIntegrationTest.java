@@ -12,6 +12,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+/*Standalone that tests GET, HEAD, and PUT requests. 
+Relies on files from resources: testfile.txt
+Writes file putfile7.html to configured location*/
+
 public class HttpRequestParserIntegrationTest {
 	
 	private static int PORT = 8081;
