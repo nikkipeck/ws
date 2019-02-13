@@ -20,6 +20,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+/*Standalone that will test GET, PUT, and HEAD requests. Also checks unsupported Http verson, 304 Not Modified, 
+HTML data, and Binary data. 
+Relies on files from resources folder: getfile.txt, testfile.txt, testHtml.html, and testBin.bin
+Writes file putfile.html to configured location*/
+
 public class WSSystemIntegrationTest {
 	
 	private static int PORT = 8081;
