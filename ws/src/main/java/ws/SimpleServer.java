@@ -3,6 +3,7 @@ package ws;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.FileHandler;
@@ -12,14 +13,15 @@ import java.util.logging.Logger;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
-public class SimpleServer{
+public class SimpleServer implements Runnable{
 	private static Properties config = new Properties();
+	private Thread runningThread;
 	private static int default_port = -1;
 	private static int max_threads = -1;
 	private static int accept_timeout = 10000; //default to 10 second timeout
 	private ServerSocket hsock;
 	private ExecutorService servicer;
-	private volatile boolean closed = false;
+	private boolean run = true;
 	
 	/*This is a very simple logging implementation of a logging system. At some point it would be wise to move to an abstraction like Apache Commons or SL4J*/
 	private final static Logger LOGGER = Logger.getLogger(SimpleServer.class.getName());
@@ -53,7 +55,6 @@ public class SimpleServer{
 		
 		if(config.containsKey("default_port"))
 			default_port = Integer.parseInt(config.getProperty("default_port"));
-		
 		if(config.containsKey("max_threads"))
 			max_threads = Integer.parseInt(config.getProperty("max_threads"));
 			
@@ -100,11 +101,16 @@ public class SimpleServer{
 	}
 	
 	public void run() {
+		synchronized(this) {
+			runningThread = Thread.currentThread();
+		}
+		
 		try {
-			while(!closed) {
-				servicer.execute(new ServiceHandler(hsock.accept()));
+			while(run && !servicer.isShutdown()) {
+				Socket s = hsock.accept();
+				s.setSoTimeout(accept_timeout);
+				servicer.execute(new ServiceHandler(s));
 			}
-			shutdown(servicer);
 		}
 		catch(Exception ee) {
 			shutdown(servicer);
@@ -149,5 +155,10 @@ public class SimpleServer{
 			servicer.shutdownNow(); //one last try
 			LOGGER.logp(Level.WARNING, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "InterruptedException caught", (Throwable)ie);
 		}
+	}
+	
+	public void stop() {
+		run = false;
+		runningThread.interrupt();
 	}
 }
