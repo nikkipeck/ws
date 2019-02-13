@@ -2,7 +2,7 @@ package ws;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.Assert.assertEquals;
-
+/*Standalone that tests status codes object*/
 public class StatusCodeUnitTest {
 	@Test
 	void testMessages() {
