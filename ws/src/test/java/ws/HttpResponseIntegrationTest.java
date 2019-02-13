@@ -13,7 +13,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/*This test class is an uncaught exception check.*/
+/*This test class is an uncaught exception check. Standalone that tests character encoding, GET, PUT, and HEAD requests.
+ Relies on files from resources: testfile.txt
+ Writes putfile.html to configured location*/
 public class HttpResponseIntegrationTest {
 	
 	private static int PORT = 8081;
