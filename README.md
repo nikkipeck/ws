@@ -61,14 +61,16 @@ ab -n 10000 -c 200 http://localhost:8081/strawberry-perl.msi (97 MB)
 Testing:
 All test files are located in /src/test/java/ws
 
-wsSystemTest - a full functionality test
+wsSystemIntegrationTest - Starts a server on port 8081, tests GET, PUT, and HEAD Requests. Also tests unsupported Http versions, 304 Not modified responses, HTML data, and binary data. Relies on resource files: getfile.txt, testfile.txt, testHtml.html, testBin.bin. Writes putfile.html to configured location.
 
-SimpleServerUnitTest - test that a server is set up on the correct port, default or specified
+SimpleServerIntegrationTest - Starts a server on port 8080 and waits for timeout. Starts a server on port 8083 and waits for timeout.
 
-HttpRequestParserUnitTest - requires SimpleServerStartTest to run, will test full parsing of http requests and responses
+HttpRequestParserIntegrationTest - Starts a server on port 8081, tests GET, PUT, and HEAD requests. Relies on resource files: testfile.txt. Writes putfile7.html to configured location.
 
-HttpResponseUnitTest - this is a basic uncaught excpetion test for the HttpResponse object
+HttpResponseIntegrationTest - this is a basic uncaught excpetion test for the HttpResponse object. Starts a server on port 8081, tess encoding, GET, PUT, and HEAD requests. Relies on resource files: testfile.txt. Writes putfile.html to configured location.
 
-ServiceHandlerUnitTest - requres SimpleServerStartTest to run, will test ServiceHandler initialization
+ServiceHandlerIntegrationTest - tests construction of ServiceHandler object
 
-SimpleServerStartTest - will start the web server and handle requests from 3rd party programs (i.e. Postman), and from internal unit tests.
+SimpleServerStartTest - Starts a server on port 8081, can handle requests. Will timeout after configured accept_timeout in milliseconds.
+
+StatusCodeUnitTest - test status codes object.
