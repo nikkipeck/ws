@@ -74,3 +74,8 @@ ServiceHandlerIntegrationTest - tests construction of ServiceHandler object
 SimpleServerStartTest - Starts a server on port 8081, can handle requests. Will timeout after configured accept_timeout in milliseconds.
 
 StatusCodeUnitTest - test status codes object.
+
+*
+
+Known issue in eclipse:
+Rolled to Java 11. There is a bug in Eclipse in which M2e overrides the maven.compiler.source and maven.compiler.target properties, so I am assuming this pom works for other IDEs. Eclipse bug: https://bugs.eclipse.org/bugs/show_bug.cgi?id=543631
