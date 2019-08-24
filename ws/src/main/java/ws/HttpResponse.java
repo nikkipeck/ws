@@ -22,15 +22,14 @@ import java.util.logging.Logger;
 import javax.activation.MimetypesFileTypeMap;
 import javax.xml.bind.DatatypeConverter;
 
-public class HttpResponse {
-	private ArrayList<String> headers = new ArrayList<String>();
-	private BufferedOutputStream socketOut = null;
-	private File contentFile = null;
-	private boolean headRequest = false;
+class HttpResponse {
+	private ArrayList<String> headers = new ArrayList<>();
+	private BufferedOutputStream socketOut;
+	private File contentFile;
 	
 	private static Properties config = new Properties();
-	private static String fileroot = null;
-	private static String working = null;
+	private static String fileroot;
+	private static String working;
 	
 	private String charset = "ISO-8859-1";
 	
@@ -38,14 +37,14 @@ public class HttpResponse {
 	
 	/*This is a very simple logging implementation of a logging system. At some point it would be wise to move to an abstraction like Apache Commons or SL4J*/
 	private final static Logger LOGGER = Logger.getLogger(SimpleServer.class.getName());
-	private static Handler logFileHandler = null;
-	
+
 	static {
-		InputStream in = null;
 		try {
-			in = HttpResponse.class.getClassLoader().getResourceAsStream("config.properties");
-			config.load(in);
-			in.close();
+			InputStream in = HttpResponse.class.getClassLoader().getResourceAsStream("config.properties");
+			if(in != null) {
+				config.load(in);
+				in.close();
+			}
 		}
 		catch(IOException ioe) {
 			ioe.printStackTrace();
@@ -58,8 +57,8 @@ public class HttpResponse {
 			String logdir = "";
 			if(config.containsKey("logdir"))
 				logdir = config.getProperty("logdir");
-			
-			logFileHandler = new FileHandler(logdir + "httpResponse.log");
+
+			Handler logFileHandler = new FileHandler(logdir + "httpResponse.log");
 			LOGGER.addHandler(logFileHandler);
 			logFileHandler.setLevel(Level.ALL);
 			LOGGER.setLevel(Level.ALL);
@@ -77,23 +76,23 @@ public class HttpResponse {
 		}	
 	}
 	
-	public HttpResponse(BufferedOutputStream socketOut) {		
+	HttpResponse(BufferedOutputStream socketOut) {
 		this.socketOut = socketOut;
 	}
 	
-	public void setEncoding(String charset) {
+	void setEncoding(String charset) {
 		this.charset = charset;
 	}
 	
-	public String getEncoding() {
+	String getEncoding() {
 		return charset;
 	}
 	
-	public void headResponse(String fileloc, String match) {
+	void headResponse(String fileloc, String match) {
 		getResponse(fileloc, match, true);
 	}
 	
-	public void getResponse(String fileloc, String match, boolean headRequest) {
+	void getResponse(String fileloc, String match, boolean headRequest) {
 		if(fileloc == null) {			
 			sendResponse("400", headRequest);
 			return;
@@ -119,8 +118,7 @@ public class HttpResponse {
 					}
 				}
 			}
-			tempFile = null;
-			
+
 			contentFile = path.toFile();
 			String mimetype = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(contentFile);
 			
@@ -140,21 +138,20 @@ public class HttpResponse {
 			}
 			
 			sendResponse("200", headRequest);
-			return;
 		}
 		catch(Exception e) {
-			LOGGER.logp(Level.WARNING, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Exception caught", (Throwable)e);
+			LOGGER.logp(Level.WARNING, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Exception caught", e);
 			sendResponse("404", headRequest);
 		}
 	}
 	
-	public void putResponse(String fileloc, BufferedInputStream is) {
+	void putResponse(String fileloc, BufferedInputStream is) {
 		if(fileloc == null) {
-			sendResponse("400", headRequest);
+			sendResponse("400", false);
 			return;
 		}
 		
-		String fileLocation = null;
+		String fileLocation;
 		if(fileloc.startsWith("/") && fileloc.length() > 1) { //file
 			if(working != null)
 				fileLocation = working + fileloc;
@@ -162,7 +159,7 @@ public class HttpResponse {
 				fileLocation = "./src/main/resources/files" + fileloc;
 		}
 		else {
-			sendResponse("400", headRequest);
+			sendResponse("400", false);
 			return;
 		}
 		
@@ -174,7 +171,7 @@ public class HttpResponse {
 				fileIsNew = true;
 			
 			out = new BufferedOutputStream(new FileOutputStream(fileLocation));
-			//is.transferTo(out); //TODO: this is blocking because is never gets an end of stream
+			//is.transferTo(out); //TODO: this is blocking because it never gets an end of stream
 			byte[] buffer = new byte[4 * 1024];
 			while (is.available() > 0) {
 				int len = is.read(buffer);
@@ -182,14 +179,13 @@ public class HttpResponse {
 			}
 			
 			if(fileIsNew)
-				sendResponse("201", headRequest);
+				sendResponse("201", false);
 			else
-				sendResponse("200", headRequest);
-			return;
+				sendResponse("200", false);
 		}
 		catch(IOException ie) {
-			LOGGER.logp(Level.WARNING, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "IOException caught", (Throwable)ie);
-			sendResponse("400", headRequest);
+			LOGGER.logp(Level.WARNING, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "IOException caught", ie);
+			sendResponse("400", false);
 		}
 		finally {
 			if(out != null) {
@@ -198,34 +194,31 @@ public class HttpResponse {
 					LOGGER.logp(Level.WARNING, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "BufferedOutputStream failed to close on exception");
 				}
 			}
-				
 		}
 	}
 			
-	public void sendResponse(String code, boolean headRequest) {
-		StringBuffer respbuff = new StringBuffer();
+	void sendResponse(String code, boolean headRequest) {
+		StringBuilder respbuild = new StringBuilder();
 		
 		//rfc2616 Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
-		respbuff.append("HTTP/1.1 " + codes.getMessageFromCode(code) + "\r\n");
+		respbuild.append("HTTP/1.1 ").append(codes.getMessageFromCode(code)).append("\r\n");
 		
 		for(String r : headers) {
-			respbuff.append(r);
+			respbuild.append(r);
 		}
 		
-		respbuff.append("Connection: close\r\n"); //close connection
-        respbuff.append("\r\n"); //end headers
+		respbuild.append("Connection: close\r\n"); //close connection
+        respbuild.append("\r\n"); //end headers
         
-        PrintStream ps = null;
-        BufferedInputStream in = null;
-        try {
-	        ps = new PrintStream(socketOut, true, charset);
-	        ps.print(respbuff.toString()); //this contains headers
+        BufferedInputStream bufferedIn = null;
+        try(PrintStream ps = new PrintStream(socketOut, true, charset)) {
+	        ps.print(respbuild.toString()); //this contains headers
 	        ps.flush();
 	        
 	        if(!code.equals("304") && !headRequest) { //do not send file in case of an unmodified response or a head request
 		        if(contentFile != null && contentFile.length() > 0) {
-		        	in = new BufferedInputStream(new FileInputStream(contentFile), 4096);
-			        in.transferTo(ps);
+		        	bufferedIn = new BufferedInputStream(new FileInputStream(contentFile), 4096);
+			        bufferedIn.transferTo(ps);
 		        }
 	        }
 	        
@@ -233,16 +226,14 @@ public class HttpResponse {
 	        socketOut.flush();
         }
         catch(IOException ioe) {
-        	LOGGER.logp(Level.WARNING, this.getClass().getName(), ioe.getStackTrace()[0].getMethodName(), "IOException caught", (Throwable)ioe);
+        	LOGGER.logp(Level.WARNING, this.getClass().getName(), ioe.getStackTrace()[0].getMethodName(), "IOException caught", ioe);
         }
         finally {
-        	if(ps != null)
-        		ps.close();
 	        try {
 		        if(socketOut != null)
 		        	socketOut.close();
-		        if(in != null)
-		        	in.close();
+		        if(bufferedIn != null)
+		        	bufferedIn.close();
 	        }
 	        catch(IOException psh) {
 	        	LOGGER.logp(Level.WARNING, this.getClass().getName(), psh.getStackTrace()[0].getMethodName(), "Socket or InputStream failed to close on exception");
