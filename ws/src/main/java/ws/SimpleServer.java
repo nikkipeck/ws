@@ -15,24 +15,19 @@ import java.util.concurrent.ExecutorService;
 
 public class SimpleServer implements Runnable{
 	private static Properties config = new Properties();
-	private Thread runningThread;
 	private static int default_port = -1;
 	private static int max_threads = -1;
 	private static int accept_timeout = 10000; //default to 10 second timeout
-	private ServerSocket hsock;
+	private ServerSocket serverSocket;
 	private ExecutorService servicer;
-	private boolean run = true;
-	
+
 	/*This is a very simple logging implementation of a logging system. At some point it would be wise to move to an abstraction like Apache Commons or SL4J*/
 	private final static Logger LOGGER = Logger.getLogger(SimpleServer.class.getName());
-	private static Handler logFileHandler = null;
- 	
+
 	static {
-		InputStream in = null;
-		try {
-			in = SimpleServer.class.getClassLoader().getResourceAsStream("config.properties");
-			config.load(in);
-			in.close();
+		try (InputStream in = SimpleServer.class.getClassLoader().getResourceAsStream("config.properties")){
+			if(in != null)
+				config.load(in);
 		}
 		catch(IOException ioe) {
 			ioe.printStackTrace();
@@ -43,7 +38,7 @@ public class SimpleServer implements Runnable{
 			if(config.containsKey("logdir"))
 				logdir = config.getProperty("logdir");
 			
-			logFileHandler = new FileHandler(logdir + "simpleserver.log");
+			Handler logFileHandler = new FileHandler(logdir + "simpleserver.log");
 			LOGGER.addHandler(logFileHandler);
 			logFileHandler.setLevel(Level.ALL);
 			LOGGER.setLevel(Level.ALL);
@@ -67,7 +62,6 @@ public class SimpleServer implements Runnable{
 			accept_timeout = Integer.parseInt(config.getProperty("accept_timeout"));
 		
 		//Informational logging
-		
 		LOGGER.log(Level.INFO, "SimpleServer configuration information. Port: " + default_port + " max threads: " + max_threads + " accept timeout: " + accept_timeout);
     }
 	
@@ -76,70 +70,74 @@ public class SimpleServer implements Runnable{
 	}	
 	
 	public SimpleServer(int port){
-		int use_port = 0;
+		int use_port;
 		if(port < 0)
 			use_port = default_port;
 		else
 			use_port = port;
 		
 		try {
-			hsock = new ServerSocket(use_port);
-			hsock.setSoTimeout(accept_timeout); //blocking on accept has to end at some point.
-			
+			serverSocket = new ServerSocket(use_port);
+
 			//Creates a thread pool that reuses a fixed number of threads operating off a shared unbounded queue.
 			servicer = Executors.newFixedThreadPool(max_threads);
 		}
 		catch(IOException ie) {
-			LOGGER.logp(Level.SEVERE, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "Error starting server" , (Throwable)ie);
-			try {hsock.close();}
-			catch(Exception e) {}
+			LOGGER.logp(Level.SEVERE, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "Error starting server" , ie);
+			try {
+				serverSocket.close();}
+			catch(Exception e) {/*I tried*/}
 			shutdown(servicer);
 		}
 		catch(Exception e) {
-			LOGGER.logp(Level.SEVERE, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Error starting server", (Throwable)e);
+			LOGGER.logp(Level.SEVERE, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Error starting server", e);
 		}
 	}
-	
+
 	public void run() {
-		synchronized(this) {
-			runningThread = Thread.currentThread();
-		}
-		
 		try {
-			while(run && !servicer.isShutdown()) {
-				Socket s = hsock.accept();
-				s.setSoTimeout(accept_timeout);
-				servicer.execute(new ServiceHandler(s));
+			while(!servicer.isShutdown()) {
+				try { //a try with resources here causes early socket closed shenanigans
+					Socket toRun = serverSocket.accept();
+					toRun.setSoTimeout(accept_timeout);
+					servicer.submit(new ServiceHandler(toRun));
+				}
+				catch(Exception e){
+					LOGGER.logp(Level.WARNING, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Exception caught", e);
+				}
 			}
 		}
 		catch(Exception ee) {
 			shutdown(servicer);
-			LOGGER.logp(Level.WARNING, this.getClass().getName(), ee.getStackTrace()[0].getMethodName(), "Exception caught", (Throwable)ee);
+			LOGGER.logp(Level.WARNING, this.getClass().getName(), ee.getStackTrace()[0].getMethodName(), "Exception caught", ee);
 		}
 		finally {
 			if(!servicer.isShutdown())
 				servicer.shutdownNow(); //prevents waiting tasks from starting and attempts to stop currently executing tasks
-			try {hsock.close();	}
+			try {
+				serverSocket.close();
+			}
 			catch(IOException ie) {
-				LOGGER.logp(Level.WARNING, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "IOException caught", (Throwable)ie);
+				LOGGER.logp(Level.WARNING, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "IOException caught", ie);
 			}
 		}
 	}
 	
-	public int getSocketPort() {
-		if(hsock != null)
-			return hsock.getLocalPort();
+	int getSocketPort() {
+		if(serverSocket != null)
+			return serverSocket.getLocalPort();
 		return -1;
 	}
-	
-	public void shutdown(ExecutorService servicer) {
+
+	private void shutdown(ExecutorService servicer) {
 		if(servicer == null)
 			return;
 		
-		if(hsock !=null && !hsock.isClosed()) {
-			try {hsock.close();}
+		if(serverSocket !=null && !serverSocket.isClosed()) {
+			try {
+				serverSocket.close();}
 			catch(IOException ee) {
-				LOGGER.logp(Level.WARNING, this.getClass().getName(), ee.getStackTrace()[0].getMethodName(), "IOException caught", (Throwable)ee);
+				LOGGER.logp(Level.WARNING, this.getClass().getName(), ee.getStackTrace()[0].getMethodName(), "IOException caught", ee);
 			}
 		}
 		
@@ -153,12 +151,7 @@ public class SimpleServer implements Runnable{
 		}
 		catch(InterruptedException ie) {
 			servicer.shutdownNow(); //one last try
-			LOGGER.logp(Level.WARNING, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "InterruptedException caught", (Throwable)ie);
+			LOGGER.logp(Level.WARNING, this.getClass().getName(), ie.getStackTrace()[0].getMethodName(), "InterruptedException caught", ie);
 		}
-	}
-	
-	public void stop() {
-		run = false;
-		runningThread.interrupt();
 	}
 }
