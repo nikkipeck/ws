@@ -2,10 +2,10 @@ package ws;
 
 import java.util.Hashtable;
 
-public class StatusCode {
-	public static Hashtable<String,String> statusCodes = new Hashtable<String,String>();
+class StatusCode {
+	private static Hashtable<String,String> statusCodes = new Hashtable<>();
 
-	public StatusCode() {
+	StatusCode() {
 		statusCodes.put("100", "100 Continue");
 		statusCodes.put("101","101 Switching Protocols");
 		
@@ -49,13 +49,10 @@ public class StatusCode {
 		statusCodes.put("502","502 Bad Gateway");
 		statusCodes.put("503","503 Service Unavailable");
 		statusCodes.put("504","504 Gateway Time-out");
-		statusCodes.put("505","505 HTTP Version not supported");		
+		statusCodes.put("505","505 HTTP Version not supported");
 	}
 	
-	public String getMessageFromCode(String code) {
-		if(statusCodes.containsKey(code)) 
-			return statusCodes.get(code);
-		else
-			return "undefined code";
+	String getMessageFromCode(String code) {
+		return statusCodes.getOrDefault(code, "undefined code");
 	}
 }
