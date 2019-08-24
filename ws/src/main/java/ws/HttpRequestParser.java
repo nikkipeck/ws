@@ -11,29 +11,28 @@ import java.util.Hashtable;
 import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.logging.FileHandler;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.nio.charset.Charset;
 
-public class HttpRequestParser {
+class HttpRequestParser {
 	private static Properties config = new Properties();
 	private static String version = null;
 	
-	HttpResponse responseObj = null;
-	private Hashtable<String,String> headerHash = new Hashtable<String,String>();
+	private HttpResponse responseObj;
+	private Hashtable<String,String> headerHash = new Hashtable<>();
 	private String charset = "ISO-8859-1";
 	
 	/*This is a very simple logging implementation of a logging system. At some point it would be wise to move to an abstraction like Apache Commons or SL4J*/
 	private final static Logger LOGGER = Logger.getLogger(SimpleServer.class.getName());
-	private static Handler logFileHandler = null;
- 	
+
 	static {
-		InputStream in = null;
 		try {
-			in = HttpRequestParser.class.getClassLoader().getResourceAsStream("config.properties");
-			config.load(in);
-			in.close();
+			InputStream in = HttpRequestParser.class.getClassLoader().getResourceAsStream("config.properties");
+			if(in != null) {
+				config.load(in);
+				in.close();
+			}
 		}
 		catch(IOException ioe) {
 			ioe.printStackTrace();
@@ -43,8 +42,8 @@ public class HttpRequestParser {
 			String logdir = "";
 			if(config.containsKey("logdir"))
 				logdir = config.getProperty("logdir");
-			
-			logFileHandler = new FileHandler(logdir + "httpRequestParser.log");
+
+			FileHandler logFileHandler = new FileHandler(logdir + "httpRequestParser.log");
 			LOGGER.addHandler(logFileHandler);
 			logFileHandler.setLevel(Level.ALL);
 			LOGGER.setLevel(Level.ALL);
@@ -62,15 +61,15 @@ public class HttpRequestParser {
 		}
 	}
 	
-	public HttpRequestParser(BufferedOutputStream out) {
+	HttpRequestParser(BufferedOutputStream out) {
 		responseObj = new HttpResponse(out);
 	}
 	
-	public void parseRequest(InputStream is) {
-		ArrayList<String> headers = new ArrayList<String>();
-		BufferedInputStream bis = null;
-    	String metver = null;
-    	try {    		 
+	void parseRequest(InputStream is) {
+		ArrayList<String> headers = new ArrayList<>();
+		BufferedInputStream bis;
+    	String metver;
+    	try {
     		/*From rfc2616: Certain buggy HTTP/1.0 client implementations generate extra CRLF's
 	 		   after a POST request. To restate what is explicitly forbidden by the
 	 		   BNF, an HTTP/1.1 client MUST NOT preface or follow a request with an
@@ -85,16 +84,16 @@ public class HttpRequestParser {
 	     	metver = URLDecoder.decode(metver, charset); //remove escaped characters
     	}
     	catch(IOException ee) {
-    		LOGGER.logp(Level.WARNING, this.getClass().getName(), ee.getStackTrace()[0].getMethodName(), "IOException caught", (Throwable)ee);
+    		LOGGER.logp(Level.WARNING, this.getClass().getName(), ee.getStackTrace()[0].getMethodName(), "IOException caught", ee);
     		responseObj.sendResponse("400", false);
     		return;
     	}
     	
     	String method = null;
      	String location = null;
-     	String httpver = null;
+     	String httpver;
     	if(metver.length() > 0) {
-    		ArrayList<String> tokens = new ArrayList<String>();
+    		ArrayList<String> tokens = new ArrayList<>();
     		StringTokenizer tokenizer = new StringTokenizer(metver, " ");
     	    while (tokenizer.hasMoreElements()) {
     	        tokens.add(tokenizer.nextToken());
@@ -117,7 +116,7 @@ public class HttpRequestParser {
 		    	}
     	    }
     	    catch(IndexOutOfBoundsException bound) {
-    	    	LOGGER.logp(Level.WARNING, this.getClass().getName(), bound.getStackTrace()[0].getMethodName(), "IndexOutOfBoundsException caught", (Throwable)bound);
+    	    	LOGGER.logp(Level.WARNING, this.getClass().getName(), bound.getStackTrace()[0].getMethodName(), "IndexOutOfBoundsException caught", bound);
     	    	responseObj.sendResponse("400", false);
     	    }
     	}
@@ -142,7 +141,8 @@ public class HttpRequestParser {
 	    		responseObj.sendResponse("400", false); //possibly a preceding CRLF in request
 	    		return;
 	    	}
-	    	
+
+	    	//location has been null checked
 	    	String decodeloc = URLDecoder.decode(location, charset).replaceAll(" ",""); //decode url, ie: remove escaped spaces and remove whitespace	    	
 	    	if(method.equalsIgnoreCase("GET")) {
 	    		//check headerHash for if-none-match
@@ -168,7 +168,7 @@ public class HttpRequestParser {
 		    }
     	}
     	catch(Exception e) {
-    		LOGGER.logp(Level.WARNING, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Exception caught", (Throwable)e);
+    		LOGGER.logp(Level.WARNING, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Exception caught", e);
     	}
     	finally {
     		try {
@@ -179,7 +179,6 @@ public class HttpRequestParser {
     		}
     	}
     	responseObj.sendResponse("505", false); //we should never get here
-    	return;
 	}
 	
 	/*rfc2616: Each header field consists
@@ -220,7 +219,7 @@ public class HttpRequestParser {
 			}
 			else { //more than one value for this header
 				String alval = headerHash.get(key);
-				StringBuffer sb = new StringBuffer();
+				StringBuilder sb = new StringBuilder();
 				sb.append(alval);
 				sb.append(",");
 				sb.append(value);
@@ -241,7 +240,7 @@ public class HttpRequestParser {
 			//ignore returns, and break on new lines
 			if(ch == '\r' || ch == '\n') {
 				if(ch == '\r') {
-					bis.read();
+					bis.read(); //and ignore
 				}
 				break;
 			}
@@ -257,10 +256,10 @@ public class HttpRequestParser {
 		If no "*" is present in an Accept-Charset field, then all character sets not explicitly mentioned get a quality value of 0, except for ISO-8859-1, which gets
 		a quality value of 1 if not explicitly mentioned.
 		Accept-Charset: iso-8859-5, unicode-1-1;q=0.8*/
-		if(charsetHeader.indexOf("*") > -1) 
+		if(charsetHeader.contains("*"))
 			return; //using ISO-8859-1, ignoring quality value(s)
 		
-		if(charsetHeader.indexOf(",") > -1){ //multiple possible charsets
+		if(charsetHeader.contains(",")){ //multiple possible charsets
 			Double hiq = -1.0;
 			String hics = null;
 			StringTokenizer chop = new StringTokenizer(charsetHeader,",");
@@ -283,7 +282,7 @@ public class HttpRequestParser {
     	        		}
     	        	}
     	        	catch(Exception e) {
-    	        		LOGGER.logp(Level.WARNING, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Exception caught", (Throwable)e);
+    	        		LOGGER.logp(Level.WARNING, this.getClass().getName(), e.getStackTrace()[0].getMethodName(), "Exception caught", e);
     	        		responseObj.sendResponse("406", false); //according to rfc2616
     	        	}
 	    	    }
