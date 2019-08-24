@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.io.IOException;
 import java.net.Socket;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -18,12 +17,10 @@ public class ServiceHandlerIntegrationTest {
 	
 	@BeforeAll
 	static void startServer() {
-		Thread serverThread = new Thread() { 
-			public void run() { 
-				ss = new SimpleServer(PORT);  
-                ss.run();
-			}
-		}; 
+		Thread serverThread = new Thread(() -> {
+			ss = new SimpleServer(PORT);
+			ss.run();
+		});
 		serverThread.start(); 
 	}
 	
@@ -38,10 +35,5 @@ public class ServiceHandlerIntegrationTest {
 		catch(IOException ioe) {
 			fail(ioe.getMessage());
 		}				
-	}
-	
-	@AfterAll
-	static void stopServer() {
-		ss.stop();
 	}
 }
