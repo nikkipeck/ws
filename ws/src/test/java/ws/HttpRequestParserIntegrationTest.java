@@ -7,37 +7,28 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-/*Standalone that tests GET, HEAD, and PUT requests. 
-Relies on files from resources: testfile.txt
-Writes file putfile7.html to configured location*/
-
-public class HttpRequestParserIntegrationTest {
+class HttpRequestParserIntegrationTest {
 	
 	private static int PORT = 8081;
 	private static SimpleServer ss;
 	
 	@BeforeAll
 	static void startServer() {
-		Thread serverThread = new Thread() { 
-			public void run() { 
-				ss = new SimpleServer(PORT);  
-                ss.run();
-			}
-		}; 
+		Thread serverThread = new Thread(() -> {
+			ss = new SimpleServer(PORT);
+			ss.run();
+		});
 		serverThread.start(); 
 	}
 	
 	@Test
 	void testSingleGet() {
-		Socket clientSocket = null;
-		try {
-			clientSocket = new Socket("localhost",PORT);
-			
+		try  (Socket clientSocket = new Socket("localhost",PORT)){
 			PrintStream printer = new PrintStream(clientSocket.getOutputStream(), true); //autoflush
 			//printer.println("GET /src/main/resources/testFile.txt HTTP/1.1"); //get file from path
 			printer.println("GET /testFile.txt HTTP/1.1"); //get file from fileroot
@@ -46,27 +37,19 @@ public class HttpRequestParserIntegrationTest {
 			printer.println(); //properly formatted request will include an empty line after headers
 			printer.flush();
 			
-			BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
 			String response = reader.readLine();
 			if(!(response.equals("HTTP/1.1 200 OK") || response.equals("HTTP/1.1 304 Not Modified")))
 				fail("invalid response " + response);			
 		}
-		catch(Exception e) {
+		catch(Exception e){
 			fail(e.getMessage());
-		}
-		finally {
-			if(clientSocket != null)
-	            try {clientSocket.close();}
-	            catch(Exception e){}
 		}
 	}
 	
 	@Test
 	void testPut() {
-		Socket clientSocket = null;
-		try {
-			clientSocket = new Socket("localhost",PORT);
-			
+		try (Socket clientSocket = new Socket("localhost",PORT)){
 			PrintStream printer = new PrintStream(clientSocket.getOutputStream(), true); //autoflush
 			printer.println("PUT /putfile7.html HTTP/1.1");
 			printer.println("Content-Type: tex/html");
@@ -76,7 +59,7 @@ public class HttpRequestParserIntegrationTest {
 	        printer.flush();
 			printer.flush();
 			
-			BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
 			String response = reader.readLine();
 			if(!(response.equals("HTTP/1.1 200 OK") || response.equals("HTTP/1.1 201 Created")))
 				fail("invalid response " + response);			
@@ -84,19 +67,11 @@ public class HttpRequestParserIntegrationTest {
 		catch(Exception e) {
 			fail(e.getMessage());
 		}
-		finally {
-			if(clientSocket != null)
-	            try {clientSocket.close();}
-	            catch(Exception e){}
-		}		
 	}
 	
 	@Test
 	void testHead() {
-		Socket clientSocket = null;
-		try {
-			clientSocket = new Socket("localhost",PORT);
-			
+		try (Socket clientSocket = new Socket("localhost",PORT)){
 			PrintStream printer = new PrintStream(clientSocket.getOutputStream(), true); //autoflush
 			printer.println("HEAD /testFile.txt HTTP/1.1");
 			printer.println("If-None-Match: \"eowowief\",\"5B01F0F8DE85CFE5166F0F07DC09591A\"");
@@ -104,7 +79,7 @@ public class HttpRequestParserIntegrationTest {
 			printer.println(); //properly formatted request will include an empty line after headers
 			printer.flush();
 			
-			BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
 			String response = reader.readLine();
 			if(!(response.equals("HTTP/1.1 200 OK") || response.equals("HTTP/1.1 304 Not Modified")))
 				fail("invalid response " + response);
@@ -136,15 +111,5 @@ public class HttpRequestParserIntegrationTest {
 		catch(IOException e) {
 			fail(e);
 		}
-		finally {
-			if(clientSocket != null)
-	            try {clientSocket.close();}
-	            catch(Exception e){}
-		}		
-	}
-	
-	@AfterAll
-	static void stopServer() {
-		ss.stop();
 	}
 }
