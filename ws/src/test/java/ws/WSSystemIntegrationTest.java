@@ -13,10 +13,8 @@ import java.io.PrintStream;
 
 import java.net.Socket;
 import java.nio.file.Files;
-import java.util.Arrays;
 import java.util.Properties;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -25,24 +23,22 @@ HTML data, and Binary data.
 Relies on files from resources folder: getfile.txt, testfile.txt, testHtml.html, and testBin.bin
 Writes file putfile.html to configured location*/
 
-public class WSSystemIntegrationTest {
+class WSSystemIntegrationTest {
 	
 	private static int PORT = 8081;
 	private static SimpleServer ss;
 	
 	@BeforeAll
 	static void startServer() {
-		Thread serverThread = new Thread() { 
-			public void run() { 
-				ss = new SimpleServer(PORT);  
-                ss.run();
-			}
-		}; 
+		Thread serverThread = new Thread(() -> {
+			ss = new SimpleServer(PORT);
+			ss.run();
+		});
 		serverThread.start(); 
 	}
 	
-	Socket clientSocket = null;
-	String charset = "ISO-8859-1";
+	private Socket clientSocket;
+	private String charset = "ISO-8859-1";
 
 	@Test
 	void testGet() {
@@ -245,12 +241,13 @@ public class WSSystemIntegrationTest {
 			}
 			
 			//go get the file root
-			InputStream in = null;
 			Properties config = new Properties();
 			try {
-				in = SimpleServer.class.getClassLoader().getResourceAsStream("config.properties");
-				config.load(in);
-				in.close();
+				InputStream in = SimpleServer.class.getClassLoader().getResourceAsStream("config.properties");
+				if(in != null) {
+					config.load(in);
+					in.close();
+				}
 			}
 			catch(IOException ioe) {
 				ioe.printStackTrace();
@@ -264,8 +261,8 @@ public class WSSystemIntegrationTest {
 			
 			File fromFs = new File(fileroot + "/testBin.bin");
 			byte[] bs = Files.readAllBytes(fromFs.toPath());
-			
-			assertTrue(Arrays.equals(payload, bs));
+
+			assertArrayEquals(payload, bs);
 			
 	        stream.close();
 	        clientSocket.close();
@@ -359,17 +356,12 @@ public class WSSystemIntegrationTest {
 			//ignore returns, and break on new lines
 			if(ch == '\r' || ch == '\n') {
 				if(ch == '\r') {
-					bis.read();
+					bis.read(); //and ignore
 				}
 				break;
 			}
 			baos.write(ch);
 		}
 		return baos.toString(charset);
-	}
-	
-	@AfterAll
-	static void stopServer() {
-		ss.stop();
 	}
 }
