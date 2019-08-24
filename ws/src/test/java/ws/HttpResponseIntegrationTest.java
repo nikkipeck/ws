@@ -13,36 +13,31 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/*This test class is an uncaught exception check. Standalone that tests character encoding, GET, PUT, and HEAD requests.
- Relies on files from resources: testfile.txt
- Writes putfile.html to configured location*/
-public class HttpResponseIntegrationTest {
+/*This test class is an uncaught exception check.*/
+class HttpResponseIntegrationTest {
 	
 	private static int PORT = 8081;
 	private static SimpleServer ss;
 	
 	@BeforeAll
 	static void startServer() {
-		Thread serverThread = new Thread() { 
-			public void run() { 
-				ss = new SimpleServer(PORT);  
-                ss.run();
-			}
-		}; 
+		Thread serverThread = new Thread(() -> {
+			ss = new SimpleServer(PORT);
+			ss.run();
+		});
 		serverThread.start(); 
 	}
 	
-	Socket socket = null;
-	HttpResponse httpr = null;
-	BufferedOutputStream out = null;
-	StatusCode codes = new StatusCode();
+	private Socket socket = null;
+	private HttpResponse httpr = null;
+	private StatusCode codes = new StatusCode();
 	
 	@BeforeEach
 	void setup() {
 		try {
 			socket = new Socket("localhost", PORT);
 			
-			out = new BufferedOutputStream(socket.getOutputStream());
+			BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream());
 			httpr = new HttpResponse(out);
 		}
 		catch(IOException ioe) {
@@ -57,10 +52,7 @@ public class HttpResponseIntegrationTest {
 		String setEncoding = httpr.getEncoding();
 		if(!setEncoding.equals(enc))
 			fail("improper encoding " + setEncoding);
-		
-		enc = null;
-		setEncoding = null;
-		
+
 		enc = "ISO-8859-1";
 		httpr.setEncoding(enc);
 		setEncoding = httpr.getEncoding();
@@ -119,10 +111,5 @@ public class HttpResponseIntegrationTest {
 			}
 		}
 		httpr = null;		
-	}
-	
-	@AfterAll
-	static void stopServer() {
-		ss.stop();
 	}
 }
