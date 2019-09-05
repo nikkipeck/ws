@@ -14,7 +14,6 @@ public class SimpleServerStartTest {
 			SimpleServer ss = new SimpleServer(PORT);
 			assertNotNull(ss);
 			ss.run();
-			ss.stop();
 		}
 		catch(ExceptionInInitializerError eiie) {
 			fail(eiie);
