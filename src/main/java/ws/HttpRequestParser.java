@@ -93,16 +93,11 @@ class HttpRequestParser {
      	String location = null;
      	String httpver;
     	if(metver.length() > 0) {
-    		ArrayList<String> tokens = new ArrayList<>();
-    		StringTokenizer tokenizer = new StringTokenizer(metver, " ");
-    	    while (tokenizer.hasMoreElements()) {
-    	        tokens.add(tokenizer.nextToken());
-    	    }
-    	    
-    	    try {
-    	    	method = tokens.get(0);
-	    		location = tokens.get(1);
-	    		httpver = tokens.get(2);
+    		String[] tokens = metver.split(" ");
+    		try {
+    	    	method = tokens[0];
+	    		location = tokens[1];
+	    		httpver = tokens[2];
 	    		//System.out.println("method " + method + " location " + location + " version " + httpver); //useful debug line
 
 	    		//there must be all three in a request
@@ -262,9 +257,8 @@ class HttpRequestParser {
 		if(charsetHeader.contains(",")){ //multiple possible charsets
 			Double hiq = -1.0;
 			String hics = null;
-			StringTokenizer chop = new StringTokenizer(charsetHeader,",");
-			while (chop.hasMoreElements()) {
-    	        String cs = chop.nextToken();
+			String[] chop = charsetHeader.split(",");
+			for(String cs: chop) {
     	        int semi = cs.indexOf(";"); //quality score
     	        if(semi > 0) {
     	        	String c = cs.substring(0, semi);
